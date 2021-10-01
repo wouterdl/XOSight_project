@@ -4,14 +4,6 @@ import torch.nn as nn
 import random
 
 
-
-##Loss functions##
-# depth estimation: L1 loss
-# semantic segmentation: cross entropy loss?
-# instance segmentation: 
-# object detection: 
-
-
 def mIOU(gt, output, n_classes):
     #gt: [H * W]
     #output: [C * H * W]
