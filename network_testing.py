@@ -84,7 +84,7 @@ class WarehouseDataset(Dataset):
             height = (self.bbox_2d_tight_data[idx][i][9] - self.bbox_2d_tight_data[idx][i][7])
             bbox_data.append(np.array([class_label, x_center/self.data_res, y_center/self.data_res, width/self.data_res, height/self.data_res]))
 
-        targets = [torch.zeros((self.num_anchors // 4, S, S, 8)) for S in self.S]
+        targets = [torch.zeros((self.num_anchors // 4, S, S, cfg.general_cfg.no_classes+5)) for S in self.S]
 
         #Applying anchor boxes
         for box in bbox_data:
@@ -121,7 +121,7 @@ class WarehouseDataset(Dataset):
 
 
         item = {"rgb": torch.from_numpy(self.rgb_data[idx][:, :, 0:3]).type(self.data_dtype).permute(2, 0, 1), 
-                "bbox": tuple(targets),
+                "bbox": tuple(targets)[::-1],
                 "depth": torch.from_numpy(self.depth_data[idx]).type(self.data_dtype), 
                 "semantic": torch.from_numpy(self.semantic_data[idx]).type(torch.int64)}
 
@@ -141,7 +141,7 @@ if __name__ == '__main__':
 
     model = FullNet(cfg=cfg, device=device).to(device)
 
-
+    print('bbox label shape: {}'.format(dataset[0]['bbox'][0].shape))
 
 
     temp_anchors = [
@@ -158,7 +158,7 @@ if __name__ == '__main__':
 
 
     
-    trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=100, scaled_anchors=scaled_anchors)
+    trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=250, scaled_anchors=scaled_anchors)
     
     
     
@@ -168,6 +168,23 @@ if __name__ == '__main__':
 
     writer = SummaryWriter()
     
+    trainer.visualize(0, dataset, cfg.general_cfg.TASKS.NAMES, model=model)
+
+
+    # testinput = dataset[0]
+    # testinput['rgb'] = testinput['rgb'].unsqueeze(0)
+
+
+    # for k, v in testinput.items():
+    #                 if torch.is_tensor(testinput[k]):
+    #                     testinput[k] = testinput[k].to(device)
+
+    #                 elif isinstance(testinput[k], list):
+    #                     #print(data[k])
+    #                     for i in range(len(testinput[k])):
+    #                         testinput[k][i] = testinput[k][i].to(device)
+    # testoutput = model(testinput)
+    # print(testoutput['bbox'][0].shape)
     
 
 

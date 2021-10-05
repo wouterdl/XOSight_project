@@ -6,6 +6,7 @@ import numpy as np
 from utils import *
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib as plt
+from config import *
 
 
 class NetworkTrainer(object):
@@ -120,10 +121,10 @@ class NetworkTrainer(object):
                         #print(data[t][1].shape)
 
                         new_loss = (
-                            self.criterion[t](outputs[t][0], data[t][3], self.scaled_anchors[0])
-                            + self.criterion[t](outputs[t][1], data[t][2], self.scaled_anchors[1])
-                            + self.criterion[t](outputs[t][2], data[t][1], self.scaled_anchors[2])
-                            + self.criterion[t](outputs[t][3], data[t][0], self.scaled_anchors[3])
+                            self.criterion[t](outputs[t][0], data[t][0], self.scaled_anchors[0])
+                            + self.criterion[t](outputs[t][1], data[t][1], self.scaled_anchors[1])
+                            + self.criterion[t](outputs[t][2], data[t][2], self.scaled_anchors[2])
+                            + self.criterion[t](outputs[t][3], data[t][3], self.scaled_anchors[3])
                         )
 
                         loss += self.loss_weights[t] * new_loss
@@ -157,6 +158,23 @@ class NetworkTrainer(object):
             self.writer.add_scalar('total trainig loss', epoch_train_loss['total_loss'], epoch)
 
 
+            if epoch > 0 and epoch % 100 == 0:
+                pred_boxes, true_boxes = get_evaluation_bboxes(
+                    loader=self.test_loader,
+                    model = self.model,
+                    iou_threshold=0.5,
+                    anchors=cfg.dataset_cfg.anchors,
+                    threshold=0.3,
+                )
+                mapval = mean_average_precision(
+                    pred_boxes,
+                    true_boxes,
+                    iou_threshold=0.5,
+                    box_format="midpoint",
+                    num_classes=cfg.general_cfg.no_classes,
+                )
+
+                print('MAP ACCURACY SCORE OF EPOCH {}: {}'.format(epoch+1, mapval))
 
             # for i, data in enumerate(self.test_loader, 0):
 
@@ -200,8 +218,15 @@ class NetworkTrainer(object):
 
 
         for k, v in groundtruth.items():
-            groundtruth[k] = torch.unsqueeze(v, 0).to(self.device)
+            if torch.is_tensor(groundtruth[k]):
+                groundtruth[k] = torch.unsqueeze(v, 0).to(self.device)
+
+            elif isinstance(groundtruth[k], list):
+                        #print(data[k])
+                        for i in range(len(groundtruth[k])):
+                            groundtruth[k][i] = groundtruth[k][i].to(self.device)
         output = model(groundtruth)#.to(self.device)
+        print(output.keys())
 
         for t in vis_tasks:
             print('writing images of {} task'.format(t))
@@ -211,13 +236,13 @@ class NetworkTrainer(object):
 
 
             if t == 'semantic':
-                output = torch.argmax(output[t].squeeze(), dim=0).detach().cpu().numpy()
-                print(output.shape)
+                sem_output = torch.argmax(output[t].squeeze(), dim=0).detach().cpu().numpy()
+                print(sem_output.shape)
                 def decode_segmap(image):
                     label_colors = np.array([(0,0,0), (128, 0, 0), (0, 128, 0), (0, 0, 128)])
-                    r = np.zeros_like(output).astype(np.uint8)
-                    g = np.zeros_like(output).astype(np.uint8)
-                    b = np.zeros_like(output).astype(np.uint8)
+                    r = np.zeros_like(sem_output).astype(np.uint8)
+                    g = np.zeros_like(sem_output).astype(np.uint8)
+                    b = np.zeros_like(sem_output).astype(np.uint8)
                     for l in range(0, 3):
                         idx = image == l
                         r[idx] = label_colors[l, 0]
@@ -228,11 +253,53 @@ class NetworkTrainer(object):
                     return rgb
 
                 imageio.imwrite('testing/{}_GT.jpeg'.format(t), decode_segmap(groundtruth[t][0, :, :].cpu()))
-                imageio.imwrite('testing/{}_output.jpeg'.format(t), decode_segmap(output))
+                imageio.imwrite('testing/{}_output.jpeg'.format(t), decode_segmap(sem_output))
+
+            elif t == 'bbox':
+                print(type(output))
+                pred_bboxes = []
+                gt_bboxes = []
+
+                # S2 = cfg.dataset_cfg.S.copy()
+                # S=cfg.dataset_cfg.S.copy()
+                # S.reverse()
+
+                # print(S)
+                # print(S2)
+
+                for i in range(len(output[t])):
+                    #print(type(output[t]))
+                    # print(output[t][i].shape)
+                    # print(torch.tensor(cfg.dataset_cfg.anchors).to(self.device)[i])
+                    # print(S[i])
+
+                    pred_bboxes.extend((cells_to_bboxes(output[t][i], self.scaled_anchors[i], S=output[t][i].shape[2])))
+                    gt_bboxes.extend((cells_to_bboxes(groundtruth[t][i].unsqueeze(0), self.scaled_anchors[i], S=groundtruth[t][i].unsqueeze(0).shape[2], is_preds=False)))
+
+                pred_bboxes_flat = [item for sublist in pred_bboxes for item in sublist]
+                gt_bboxes_flat = [item for sublist in gt_bboxes for item in sublist]
+
+                print('length of bbox list: {}'.format(len(pred_bboxes_flat)))
+                print(pred_bboxes_flat[0])
+                pred_bboxes_nms = non_max_suppression(pred_bboxes_flat, 0.5, 0.5)
+                print('length pred bbox list nms: {}'.format(len(pred_bboxes_nms)))
+                gt_bboxes_nms = non_max_suppression(gt_bboxes_flat, .9, .9)
+                print('length  gt bbox list flat: {}'.format(len(gt_bboxes_nms)))
+
+                plot_image_bbox(groundtruth['rgb'][0, :, :].detach().cpu().numpy(), pred_bboxes_nms)
+                plot_image_bbox(groundtruth['rgb'][0, :, :].detach().cpu().numpy(), gt_bboxes_nms, name='GT')
+
                 
+
+
+
+
             else:
                 imageio.imwrite('testing/{}_GT.jpeg'.format(t), groundtruth[t][0, :, :].detach().cpu().numpy())
                 imageio.imwrite('testing/{}_output.jpeg'.format(t), output[t][0, 0, :, :].detach().cpu().numpy())
+
+
+
     
     
 
