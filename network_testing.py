@@ -23,6 +23,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class WarehouseDataset(Dataset):
+    '''
+    Class that turns the generated isaac-sim dataset into a Pytorch dataset
+    '''
     def __init__(self, cfg):
         
         self.data_dtype = torch.float32
@@ -71,7 +74,7 @@ class WarehouseDataset(Dataset):
     def __getitem__(self, idx):
 
 
-        #Making BBox data suitable for YOLO head
+        ###Making BBox data suitable for YOLO head###
         bbox_data = []
 
         #rearranging the bbox data to [class_label, x, y, width, height]
@@ -119,7 +122,7 @@ class WarehouseDataset(Dataset):
 
 
 
-
+        ###creating the item that is returned by the function
         item = {"rgb": torch.from_numpy(self.rgb_data[idx][:, :, 0:3]).type(self.data_dtype).permute(2, 0, 1), 
                 "bbox": tuple(targets)[::-1],
                 "depth": torch.from_numpy(self.depth_data[idx]).type(self.data_dtype), 
@@ -144,13 +147,6 @@ if __name__ == '__main__':
     print('bbox label shape: {}'.format(dataset[0]['bbox'][0].shape))
 
 
-    temp_anchors = [
-        [(0.28, 0.22), (0.38, 0.48), (0.9, 0.78)],
-        [(0.07, 0.15), (0.15, 0.11), (0.14, 0.29)],
-        [(0.02, 0.03), (0.04, 0.07), (0.08, 0.06)],
-        ]
-
-    temp_S = [8, 16, 32]
     scaled_anchors = (
         torch.tensor(cfg.dataset_cfg.anchors)
         * torch.tensor(cfg.dataset_cfg.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
@@ -158,7 +154,7 @@ if __name__ == '__main__':
 
 
     
-    trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=250, scaled_anchors=scaled_anchors)
+    trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=200, scaled_anchors=scaled_anchors)
     
     
     

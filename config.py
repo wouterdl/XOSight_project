@@ -12,7 +12,7 @@ general_cfg = edict(loss_weights={})
 
 general_cfg.loss_weights['depth'] = 1
 general_cfg.loss_weights['semantic'] = 1
-general_cfg.loss_weights['bbox'] = 0.01
+general_cfg.loss_weights['bbox'] = 1
 
 general_cfg.no_classes = 3
 general_cfg.img_size = 256
@@ -32,6 +32,8 @@ dataset_cfg['anchors'] = [
 
 dataset_cfg['S'] = [8, 16, 32, 64]
 dataset_cfg['iou_thresh'] = 0.5
+
+dataset_cfg.no_classes = 3
 
 
 ##HRnet backbone

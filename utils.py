@@ -20,6 +20,7 @@ def mIOU(gt, output, n_classes):
     #results = np.zeros((H, W))
 
     output = torch.argmax(output.squeeze(), dim=0).detach().cpu().numpy()
+    gt = gt.detach().cpu().numpy()
 
     intersection = np.logical_and(gt, output)
     union = np.logical_or(gt, output)
@@ -95,6 +96,9 @@ def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
         
 
 class YoloLoss(nn.Module):
+    '''
+    Class that calculates the loss of the YOLO head.
+    '''
     def __init__(self):
         super().__init__()
         self.mse = nn.MSELoss()

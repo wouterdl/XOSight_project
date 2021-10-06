@@ -6,6 +6,9 @@ import torch.nn.functional as F
 
 
 class BasicBlock(nn.Module):
+    '''
+    Basic block used in MTI-net
+    '''
     expansion = 1
     __constants__ = ['downsample']
 
@@ -100,6 +103,7 @@ class MultiTaskDistillationModule(nn.Module):
         return out
 
 class HighResolutionHead(nn.Module):
+
     def __init__(self, backbone_channels, num_outputs):
         super(HighResolutionHead, self).__init__()
         last_inp_channels = sum(backbone_channels)
@@ -144,6 +148,9 @@ class CNNBlock(nn.Module):
             return self.conv(x)
 
 class ScalePrediction(nn.Module):
+    '''
+    YOLO prediction module at a specified scale.
+    '''
     def __init__(self, in_channels, cfg):
         super(ScalePrediction, self).__init__()
         self.num_classes = cfg.num_classes
@@ -163,6 +170,9 @@ class ScalePrediction(nn.Module):
 
 
 class AttentionModule(nn.Module):
+    '''
+    Attention module used to link the YOLO head to the rest of the network.
+    '''
     def __init__(self, channel, cfg):
         super(AttentionModule, self).__init__()
 

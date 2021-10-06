@@ -7,6 +7,9 @@ from hrnet_backbone import *
 
 
 class FullNet(nn.Module):
+    '''
+    Class that combines the backbone and MTI-net components, and adds the YOLO head to create the full network.
+    '''
     def __init__(self, cfg, device):
 
         super(FullNet, self).__init__()

@@ -10,8 +10,11 @@ from config import *
 
 
 class NetworkTrainer(object):
+    '''
+    Class that trains the specified network.
+    '''
 
-    def __init__(self, model, dataset, tasks, loss_weights, scaled_anchors, optimizer='sgd', learning_rate=0.005, momentum=0.9, max_epochs=20, batch_size=2, num_workers=2, device='cuda'):
+    def __init__(self, model, dataset, tasks, loss_weights, scaled_anchors, optimizer='sgd', learning_rate=0.0001, momentum=0.9, max_epochs=20, batch_size=2, num_workers=2, device='cuda'):
         super(NetworkTrainer, self).__init__()
         self.model = model
         self.optimizer = optimizer
@@ -77,8 +80,21 @@ class NetworkTrainer(object):
                     Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
 
     
-    
+    def move_to_device(self, data):
+        for k, v in data.items():
+                    if torch.is_tensor(data[k]):
+                        data[k] = data[k].to(self.device)
+
+                    elif isinstance(data[k], list):
+                        #print(data[k])
+                        for i in range(len(data[k])):
+                            data[k][i] = data[k][i].to(self.device)
+
+
     def train(self):
+        '''
+        Function that trains the network and stores losses and accuracies to be used by tensorboard.
+        '''
 
         train_loss_history = []
         test_loss_history = []
@@ -91,21 +107,15 @@ class NetworkTrainer(object):
             epoch_train_loss = {'total_loss':0.0}
             for t in self.tasks:
                 epoch_train_loss[t] = 0.0
-            epoch_test_loss = 0.0
+            epoch_test_loss = {'total_loss':0.0}
+            for t in self.tasks:
+                epoch_test_loss[t] = 0.0
 
             epoch_train_rmse = 0
 
             for i, data in enumerate(self.train_loader, 0):
 
-                for k, v in data.items():
-                    if torch.is_tensor(data[k]):
-                        data[k] = data[k].to(self.device)
-
-                    elif isinstance(data[k], list):
-                        #print(data[k])
-                        for i in range(len(data[k])):
-                            data[k][i] = data[k][i].to(self.device)
-                       
+                self.move_to_device(data)                       
 
                 self.optimizer.zero_grad()
 
@@ -114,7 +124,7 @@ class NetworkTrainer(object):
 
 
                 for t in self.tasks:
-                    
+                    task_loss = 0.0
                     
                     if t == 'bbox':
 
@@ -127,28 +137,31 @@ class NetworkTrainer(object):
                             + self.criterion[t](outputs[t][3], data[t][3], self.scaled_anchors[3])
                         )
 
-                        loss += self.loss_weights[t] * new_loss
+                        task_loss = self.loss_weights[t] * new_loss
+                        loss += task_loss
+                        
                     
                     else:
-                        loss += self.loss_weights[t] * self.criterion[t](outputs[t], data[t])
+
+                        task_loss = self.loss_weights[t] * self.criterion[t](outputs[t], data[t])
+                        loss += task_loss
 
                         if t == 'depth':
                             
                             epoch_train_rmse += self.criterion[t](outputs[t], data[t])
                     
-                    epoch_train_loss[t] += loss / self.loss_weights[t]
+                    epoch_train_loss[t] += task_loss / self.loss_weights[t]
+                    epoch_train_loss['total_loss'] += loss
 
 
 
                 
-                epoch_train_loss['total_loss'] += loss
+                
                 loss.backward()
                 #self.plot_grad_flow(self.model.named_parameters())
                 self.optimizer.step()
                 # for tag, parm in self.model.named_parameters():
                 #     self.writer.add_histogram(tag, parm.grad.data.clone().cpu().numpy(), epoch)
-
-                
 
             print('epoch {} train loss: {}'.format(epoch+1, epoch_train_loss))
 
@@ -157,48 +170,50 @@ class NetworkTrainer(object):
 
             self.writer.add_scalar('total trainig loss', epoch_train_loss['total_loss'], epoch)
 
+            if epoch > 0 and epoch % 1 == 0:
+            
+                for i, data in enumerate(self.test_loader, 0):
+
+                    self.move_to_device(data)
+
+                    outputs = self.model(data)
+                    loss = 0.0
+
+
+                    for t in self.tasks:
+                        task_loss = 0.0
+                        
+                        if t == 'bbox':
+
+                            
+
+                            new_loss = (
+                                self.criterion[t](outputs[t][0], data[t][0], self.scaled_anchors[0])
+                                + self.criterion[t](outputs[t][1], data[t][1], self.scaled_anchors[1])
+                                + self.criterion[t](outputs[t][2], data[t][2], self.scaled_anchors[2])
+                                + self.criterion[t](outputs[t][3], data[t][3], self.scaled_anchors[3])
+                            )
+                            task_loss = self.loss_weights[t] * new_loss
+                            loss += task_loss
+                        
+                        else:
+                            task_loss = self.loss_weights[t] * self.criterion[t](outputs[t], data[t])
+                            loss += task_loss
+
+                        
+                        epoch_test_loss[t] += task_loss / self.loss_weights[t]
+                        epoch_test_loss['total_loss'] += loss
+
+
+                for t in self.tasks:
+                    self.writer.add_scalar('test loss for task {}'.format(t), epoch_test_loss[t], epoch)
+
+                self.writer.add_scalar('total test loss', epoch_test_loss['total_loss'], epoch)
 
             if epoch > 0 and epoch % 100 == 0:
-                pred_boxes, true_boxes = get_evaluation_bboxes(
-                    loader=self.test_loader,
-                    model = self.model,
-                    iou_threshold=0.5,
-                    anchors=cfg.dataset_cfg.anchors,
-                    threshold=0.3,
-                )
-                mapval = mean_average_precision(
-                    pred_boxes,
-                    true_boxes,
-                    iou_threshold=0.5,
-                    box_format="midpoint",
-                    num_classes=cfg.general_cfg.no_classes,
-                )
 
-                print('MAP ACCURACY SCORE OF EPOCH {}: {}'.format(epoch+1, mapval))
+                self.get_accuracy_metrics(self.test_loader, self.tasks, epoch, 'test')
 
-            # for i, data in enumerate(self.test_loader, 0):
-
-            #     for k, v in data.items():
-            #         data[k] = data[k].to(self.device)
-
-            #     outputs = self.model(data)
-            #     loss = 0.0
-
-
-            #     for t in self.tasks:
-            #         #print('calculating loss for task: {}'.format(t))
-            #         # if t == 'semantic':
-            #         #     outputs[t] = torch.argmax(outputs[t].squeeze(), dim=1).type(torch.int64)
-            #         #     #print(outputs[t])
-            #         #print(outputs[t].type())    
-            #         loss += self.loss_weights[t] * self.criterion[t](torch.squeeze(outputs[t]), data[t])
-
-
-
-                
-            #     epoch_test_loss += loss
-
-            # print('epoch {} test loss: {}'.format(epoch+1, epoch_test_loss))
 
             train_loss_history.append(epoch_train_loss)
             
@@ -207,11 +222,70 @@ class NetworkTrainer(object):
 
 
             
-            
+    def get_accuracy_metrics(self, loader, tasks, epoch, set):
+
+
+
+        for t in tasks:
+
+
+            if t == 'bbox':
+                pred_boxes, true_boxes = get_evaluation_bboxes(
+                    loader=self.test_loader,
+                    model = self.model,
+                    iou_threshold=0.5,
+                    anchors=cfg.dataset_cfg.anchors,
+                    threshold=0.5,
+                )
+
+                mapval = mean_average_precision(
+                    pred_boxes,
+                    true_boxes,
+                    iou_threshold=0.5,
+                    box_format="midpoint",
+                    num_classes=cfg.general_cfg.no_classes,
+                )
+                self.writer.add_scalar('Object detection mAPscore ({}): '.format(set), mapval, epoch)
+                print('MAP ACCURACY SCORE OF EPOCH {}: {}'.format(epoch+1, mapval)) 
+
+
+            if t == 'depth':
+                depth_RMSE = 0.0
+                for i, data in enumerate(loader, 0):
+                    self.move_to_device(data)
+
+                    output = self.model(data)
+
+                    depth_RMSE += self.criterion[t](output[t], data[t])
+
+                self.writer.add_scalar('Depth RMSE ({}): '.format(set), depth_RMSE, epoch)
+                
+
+            # if t == 'semantic':
+            #     iou_total = 0
+            #     for i, data in enumerate(loader, 0):
+            #         self.move_to_device(data)
+
+            #         output = self.model(data)
+
+            #         iou_total += mIOU(data[t], output[t], cfg.general_cfg.no_classes)
+
+            #     miou = iou_total / len(loader.dataset)
+            #     self.writer.add_scalar('semantic mIOU ({}): '.format(set), miou, epoch)
+
+
+            else:
+                print('accuracy metric for task {} not implemented!'.format(t))
+
+
 
 
 
     def visualize(self, idx, dataset, vis_tasks, model):
+        '''
+        Function that gives qualitative results by saving ground truth and output images per task for a given input image.
+        '''
+
 
         groundtruth = dataset[idx]
 

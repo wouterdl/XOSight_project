@@ -290,44 +290,14 @@ blocks_dict = {
 
 
 class HighResolutionNet(nn.Module):
+    '''
+    Class that combines the different building blocks to create the HRnet backbone.
+    '''
 
     def __init__(self,
                  cfg=None,
                  norm_layer=None):
         super(HighResolutionNet, self).__init__()
-
-
-
-        #hardcoded HRNet 18 config
-        # cfg = defaultdict(dict)
-        
-        # cfg['STAGE1']['NUM_MODULES'] = 1
-        # cfg['STAGE1']['NUM_BRANCHES'] = 1
-        # cfg['STAGE1']['NUM_BLOCKS'] = [4]
-        # cfg['STAGE1']['NUM_CHANNELS'] = [64]
-        # cfg['STAGE1']['BLOCK'] = 'BOTTLENECK'
-        # cfg['STAGE1']['FUSE_METHOD'] = 'SUM'
-
-        # cfg['STAGE2']['NUM_MODULES'] = 1
-        # cfg['STAGE2']['NUM_BRANCHES'] = 2
-        # cfg['STAGE2']['NUM_BLOCKS'] = [4, 4]
-        # cfg['STAGE2']['NUM_CHANNELS'] = [18, 36]
-        # cfg['STAGE2']['BLOCK'] = 'BASIC'
-        # cfg['STAGE2']['FUSE_METHOD'] = 'SUM'
-
-        # cfg['STAGE3']['NUM_MODULES'] = 4
-        # cfg['STAGE3']['NUM_BRANCHES'] = 3
-        # cfg['STAGE3']['NUM_BLOCKS'] = [4, 4, 4]
-        # cfg['STAGE3']['NUM_CHANNELS'] = [18, 36, 72]
-        # cfg['STAGE3']['BLOCK'] = 'BASIC'
-        # cfg['STAGE3']['FUSE_METHOD'] = 'SUM'
-
-        # cfg['STAGE4']['NUM_MODULES'] = 3
-        # cfg['STAGE4']['NUM_BRANCHES'] = 4
-        # cfg['STAGE4']['NUM_BLOCKS'] = [4, 4, 4, 4]
-        # cfg['STAGE4']['NUM_CHANNELS'] = [18, 36, 72, 144]
-        # cfg['STAGE4']['BLOCK'] = 'BASIC'
-        # cfg['STAGE4']['FUSE_METHOD'] = 'SUM'
 
 
 
