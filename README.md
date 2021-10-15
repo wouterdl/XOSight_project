@@ -6,7 +6,7 @@
 A general testing script for generating the dataset
 - _network testing.py_:\
 Script that converts the dataset to a pytorch dataset and runs the main loop of the network
-- _hrnet_bacbone.py_:\
+- _hrnet_backbone.py_:\
 Contains the HRNet bacbone of the network
 - _mti_net.py_:\
 Contains the MTI-Net segment of the network
