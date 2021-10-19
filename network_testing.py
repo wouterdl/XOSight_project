@@ -25,6 +25,17 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class WarehouseDataset(Dataset):
     '''
     Class that turns the generated isaac-sim dataset into a Pytorch dataset
+    INPUT:
+    for every task a folder 'TASK_NAME', containing .npy files with labels for every sample
+
+    OUTPUT:
+    a pytorch iterable dataset with for every index:
+    - item: a dict, where item['rgb'] is the input data, and item['TASK'] the labels for task TASK:
+        - 'rgb' : torch.tensor[C, H, W]
+        - task 'semantic': torch.tensor[H, W]
+        - task 'depth': torch.tensor[H, W]
+        - task 'bbox' : tuple(torch.tensor[anchors_per_scale, S, S, no_classes + 5] for every scale)
+
     '''
     def __init__(self, cfg):
         
@@ -51,6 +62,7 @@ class WarehouseDataset(Dataset):
         self.ignore_iou_thresh = cfg['iou_thresh']
 
 
+        #Reading and storing the data from the npy files
         for i in range(self.data_len):
             print('reading data of sample {}'.format(i))
         
@@ -79,13 +91,13 @@ class WarehouseDataset(Dataset):
 
         #rearranging the bbox data to [class_label, x, y, width, height]
         for i in range(self.bbox_2d_tight_data[idx].shape[0]):
-
-            class_label = self.bbox_2d_tight_data[idx][i][5]
-            x_center = (self.bbox_2d_tight_data[idx][i][6] + self.bbox_2d_tight_data[idx][i][8])/2
-            y_center = (self.bbox_2d_tight_data[idx][i][7] + self.bbox_2d_tight_data[idx][i][9])/2
-            width = (self.bbox_2d_tight_data[idx][i][8] - self.bbox_2d_tight_data[idx][i][6])
-            height = (self.bbox_2d_tight_data[idx][i][9] - self.bbox_2d_tight_data[idx][i][7])
-            bbox_data.append(np.array([class_label, x_center/self.data_res, y_center/self.data_res, width/self.data_res, height/self.data_res]))
+            if not self.bbox_2d_tight_data[idx][i][5] == 1:
+                class_label = self.bbox_2d_tight_data[idx][i][5]
+                x_center = (self.bbox_2d_tight_data[idx][i][6] + self.bbox_2d_tight_data[idx][i][8])/2
+                y_center = (self.bbox_2d_tight_data[idx][i][7] + self.bbox_2d_tight_data[idx][i][9])/2
+                width = (self.bbox_2d_tight_data[idx][i][8] - self.bbox_2d_tight_data[idx][i][6])
+                height = (self.bbox_2d_tight_data[idx][i][9] - self.bbox_2d_tight_data[idx][i][7])
+                bbox_data.append(np.array([class_label, x_center/self.data_res, y_center/self.data_res, width/self.data_res, height/self.data_res]))
 
         targets = [torch.zeros((self.num_anchors // 4, S, S, cfg.general_cfg.no_classes+5)) for S in self.S]
 
@@ -122,7 +134,7 @@ class WarehouseDataset(Dataset):
 
 
 
-        ###creating the item that is returned by the function
+        ###creating the item dict that is returned by the function
         item = {"rgb": torch.from_numpy(self.rgb_data[idx][:, :, 0:3]).type(self.data_dtype).permute(2, 0, 1), 
                 "bbox": tuple(targets)[::-1],
                 "depth": torch.from_numpy(self.depth_data[idx]).type(self.data_dtype), 
@@ -141,8 +153,8 @@ class WarehouseDataset(Dataset):
 if __name__ == '__main__':
     
     dataset = WarehouseDataset(cfg['dataset_cfg'])
-
-    model = FullNet(cfg=cfg, device=device).to(device)
+    print(dataset[0]['bbox'][0].shape)
+    model = FullNet(cfg=cfg, device=device, yolo=True).to(device)
 
     print('bbox label shape: {}'.format(dataset[0]['bbox'][0].shape))
 
@@ -154,7 +166,7 @@ if __name__ == '__main__':
 
 
     
-    trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=200, scaled_anchors=scaled_anchors)
+    trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=10, scaled_anchors=scaled_anchors)
     
     
     

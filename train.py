@@ -14,7 +14,7 @@ class NetworkTrainer(object):
     Class that trains the specified network.
     '''
 
-    def __init__(self, model, dataset, tasks, loss_weights, scaled_anchors, optimizer='sgd', learning_rate=0.0001, momentum=0.9, max_epochs=20, batch_size=2, num_workers=2, device='cuda'):
+    def __init__(self, model, dataset, tasks, loss_weights, scaled_anchors, optimizer='sgd', learning_rate=0.0001, momentum=0.9, max_epochs=20, batch_size=1, num_workers=2, device='cuda'):
         super(NetworkTrainer, self).__init__()
         self.model = model
         self.optimizer = optimizer
@@ -119,7 +119,9 @@ class NetworkTrainer(object):
 
                 self.optimizer.zero_grad()
 
+
                 outputs = self.model(data)
+
                 loss = 0.0
 
 
@@ -159,9 +161,15 @@ class NetworkTrainer(object):
                 
                 loss.backward()
                 #self.plot_grad_flow(self.model.named_parameters())
+                #print(type(torch.autograd.grad))
+                
                 self.optimizer.step()
                 # for tag, parm in self.model.named_parameters():
-                #     self.writer.add_histogram(tag, parm.grad.data.clone().cpu().numpy(), epoch)
+                #     if parm.grad == None:
+                #         print('NONETYPE PARM: {}'.format(tag))
+                #     else:
+                #         self.writer.add_histogram(tag, parm.grad.clone().cpu().numpy(), epoch)
+                
 
             print('epoch {} train loss: {}'.format(epoch+1, epoch_train_loss))
 
@@ -170,7 +178,7 @@ class NetworkTrainer(object):
 
             self.writer.add_scalar('total trainig loss', epoch_train_loss['total_loss'], epoch)
 
-            if epoch > 0 and epoch % 1 == 0:
+            if epoch > 0 and epoch % 100 == 0:
             
                 for i, data in enumerate(self.test_loader, 0):
 
@@ -204,13 +212,14 @@ class NetworkTrainer(object):
                         epoch_test_loss[t] += task_loss / self.loss_weights[t]
                         epoch_test_loss['total_loss'] += loss
 
-
+                
                 for t in self.tasks:
                     self.writer.add_scalar('test loss for task {}'.format(t), epoch_test_loss[t], epoch)
+                    #self.writer.add_scalar('test loss per task', epoch_test_loss[t], epoch)
 
                 self.writer.add_scalar('total test loss', epoch_test_loss['total_loss'], epoch)
 
-            if epoch > 0 and epoch % 100 == 0:
+            if epoch > 0 and epoch % 2 == 0:
 
                 self.get_accuracy_metrics(self.test_loader, self.tasks, epoch, 'test')
 
@@ -235,8 +244,40 @@ class NetworkTrainer(object):
                     model = self.model,
                     iou_threshold=0.5,
                     anchors=cfg.dataset_cfg.anchors,
-                    threshold=0.5,
+                    threshold=0.8,
                 )
+                # pred_boxes = []
+                # true_boxes = []
+                # for i in range(len(self.dataset)):
+                #     temp_pred_boxes = []
+                #     temp_true_boxes = []
+
+                #     gt = self.dataset[i]
+
+                #     for k, v in gt.items():
+                #         if torch.is_tensor(gt[k]):
+                #             gt[k] = torch.unsqueeze(v, 0).to(self.device)
+
+                #         elif isinstance(gt[k], list):
+                #         #print(data[k])
+                #             for i in range(len(gt[k])):
+                #                 gt[k][i] = gt[k][i].to(self.device)
+                #     output = self.model(gt)
+                #     for j in range(len(output[t])):
+
+                    
+                #         print('output shape: {}'.format(output[t][0].shape))
+                #         temp_pred_boxes.append([i] + (cells_to_bboxes(output[t][j], self.scaled_anchors[j], S=output[t][j].shape[2])))
+                #         temp_true_boxes.append([i] + (cells_to_bboxes(gt[t][j].unsqueeze(0), self.scaled_anchors[j], S=gt[t][j].unsqueeze(0).shape[2], is_preds=False)))
+
+                #         pred_boxes_flat = [item for sublist in temp_pred_boxes for item in sublist]
+                #         true_boxes_flat = [item for sublist in temp_true_boxes for item in sublist]
+
+                #         pred_boxes_nms = non_max_suppression(pred_boxes_flat, 0.5, 0.5)
+                #         true_boxes_nms = non_max_suppression(true_boxes_flat, 0.9, 0.9)
+
+                #         pred_boxes.extend(pred_boxes_nms)
+                #         true_boxes.extend(true_boxes_nms)
 
                 mapval = mean_average_precision(
                     pred_boxes,
@@ -248,30 +289,45 @@ class NetworkTrainer(object):
                 self.writer.add_scalar('Object detection mAPscore ({}): '.format(set), mapval, epoch)
                 print('MAP ACCURACY SCORE OF EPOCH {}: {}'.format(epoch+1, mapval)) 
 
+                idx = 0
+                groundtruth = self.dataset[idx]
+                #print('another test: {}'.format(pred_boxes))
 
-            if t == 'depth':
-                depth_RMSE = 0.0
-                for i, data in enumerate(loader, 0):
-                    self.move_to_device(data)
+                #print('pred test: {}'.format([x for x in pred_boxes if x[0]==idx][0]))
+                #print('true test: {}'.format([x for x in true_boxes if x[0]==idx][0]))
+                #print('rgb shape: {}'.format(groundtruth['rgb'][:, :, :].detach().cpu().numpy().shape))
 
-                    output = self.model(data)
+                print('AMOUNT OF DRAWN BOXES FROM PREDICTIONS: {}'.format(len([x[1:] for x in pred_boxes if x[0]==idx])))
+                plot_image_bbox(groundtruth['rgb'][:, :, :].detach().cpu().numpy(), [x[1:] for x in pred_boxes if x[0]==idx], name='pred_test')
+                plot_image_bbox(groundtruth['rgb'][:, :, :].detach().cpu().numpy(), [x[1:] for x in true_boxes if x[0]==idx], name='GT_test')
 
-                    depth_RMSE += self.criterion[t](output[t], data[t])
 
-                self.writer.add_scalar('Depth RMSE ({}): '.format(set), depth_RMSE, epoch)
-                
-
-            # if t == 'semantic':
-            #     iou_total = 0
+            # if t == 'depth':
+            #     depth_RMSE = 0.0
             #     for i, data in enumerate(loader, 0):
             #         self.move_to_device(data)
 
             #         output = self.model(data)
 
-            #         iou_total += mIOU(data[t], output[t], cfg.general_cfg.no_classes)
+            #         depth_RMSE += self.criterion[t](output[t], data[t])
 
-            #     miou = iou_total / len(loader.dataset)
-            #     self.writer.add_scalar('semantic mIOU ({}): '.format(set), miou, epoch)
+            #     self.writer.add_scalar('Depth RMSE ({}): '.format(set), depth_RMSE, epoch)
+                
+
+            if t == 'semantic':
+                iou_total = 0
+                for i, data in enumerate(loader, 0):
+                    self.move_to_device(data)
+
+                    output = self.model(data)
+
+                    for j in range(self.batch_size):
+
+                        iou_total += mIOU(data[t][j], output[t][j], cfg.general_cfg.no_classes)
+
+                miou = iou_total / len(loader.dataset)
+                self.writer.add_scalar('semantic mIOU ({}): '.format(set), miou, epoch)
+                print('semantic mIOU score: {}'.format(miou))
 
 
             else:
@@ -346,6 +402,7 @@ class NetworkTrainer(object):
                     # print(output[t][i].shape)
                     # print(torch.tensor(cfg.dataset_cfg.anchors).to(self.device)[i])
                     # print(S[i])
+                    print('gt shape before c2b: {}'.format(groundtruth[t][i].shape))
 
                     pred_bboxes.extend((cells_to_bboxes(output[t][i], self.scaled_anchors[i], S=output[t][i].shape[2])))
                     gt_bboxes.extend((cells_to_bboxes(groundtruth[t][i].unsqueeze(0), self.scaled_anchors[i], S=groundtruth[t][i].unsqueeze(0).shape[2], is_preds=False)))
@@ -353,12 +410,15 @@ class NetworkTrainer(object):
                 pred_bboxes_flat = [item for sublist in pred_bboxes for item in sublist]
                 gt_bboxes_flat = [item for sublist in gt_bboxes for item in sublist]
 
+
                 print('length of bbox list: {}'.format(len(pred_bboxes_flat)))
                 print(pred_bboxes_flat[0])
-                pred_bboxes_nms = non_max_suppression(pred_bboxes_flat, 0.5, 0.5)
+                pred_bboxes_nms = non_max_suppression(pred_bboxes_flat, 0.5, 0.8)
                 print('length pred bbox list nms: {}'.format(len(pred_bboxes_nms)))
-                gt_bboxes_nms = non_max_suppression(gt_bboxes_flat, .9, .9)
-                print('length  gt bbox list flat: {}'.format(len(gt_bboxes_nms)))
+                #gt_bboxes_nms = non_max_suppression(gt_bboxes_flat, .9, .9)
+                print('length  gt bbox list flat: {}'.format(len(gt_bboxes_flat)))
+
+                print('rgb shape: {}'.format(groundtruth['rgb'][0, :, :].detach().cpu().numpy().shape))
 
                 plot_image_bbox(groundtruth['rgb'][0, :, :].detach().cpu().numpy(), pred_bboxes_nms)
                 plot_image_bbox(groundtruth['rgb'][0, :, :].detach().cpu().numpy(), gt_bboxes_nms, name='GT')

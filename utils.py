@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from tqdm import tqdm
 from collections import Counter
+from config import *
 
 
 
@@ -18,9 +19,14 @@ def mIOU(gt, output, n_classes):
     #H, W = output.shape[1], output.shape[2]
 
     #results = np.zeros((H, W))
+    #print('gt shape: {}'.format(gt.shape))
+    #print('output shape: {}'.format(output.shape))
 
     output = torch.argmax(output.squeeze(), dim=0).detach().cpu().numpy()
     gt = gt.detach().cpu().numpy()
+
+    #print('gt shape: {}'.format(gt.shape))
+    #print('output shape: {}'.format(output.shape))
 
     intersection = np.logical_and(gt, output)
     union = np.logical_or(gt, output)
@@ -221,6 +227,73 @@ def cells_to_bboxes(predictions, anchors, S, is_preds=True):
     converted_bboxes = torch.cat((best_class, scores, x, y, w_h), dim=-1).reshape(BATCH_SIZE, num_anchors * S * S, 6)
     return converted_bboxes.tolist()
 
+# def non_max_suppression(bboxes, iou_threshold, threshold, box_format="midpoint"):
+#     """
+#     Video explanation of this function:
+#     https://youtu.be/YDkjWEN8jNA
+#     Does Non Max Suppression given bboxes
+#     Parameters:
+#         bboxes (list): list of lists containing all bboxes with each bboxes
+#         specified as [class_pred, prob_score, x1, y1, x2, y2]
+#         iou_threshold (float): threshold where predicted bboxes is correct
+#         threshold (float): threshold to remove predicted bboxes (independent of IoU)
+#         box_format (str): "midpoint" or "corners" used to specify bboxes
+#     Returns:
+#         list: bboxes after performing NMS given a specific IoU threshold
+#     """
+
+#     assert type(bboxes) == list
+#     idx_bool = False
+#     if len(bboxes[0]) == 7:
+#         idx_bool = True
+    
+#     if idx_bool == True:
+#         bboxes = [box for box in bboxes if box[2] > threshold]
+#         bboxes = sorted(bboxes, key=lambda x: x[2], reverse=True)
+#     else:
+#         bboxes = [box for box in bboxes if box[1] > threshold]
+#         bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
+
+
+    
+#     bboxes_after_nms = []
+
+#     while bboxes:
+#         chosen_box = bboxes.pop(0)
+#         if idx_bool == True:
+#             idx = chosen_box[0] 
+
+#             bboxes = [
+#                 box
+#                 for box in bboxes
+#                 if box[1] != chosen_box[1]
+#                 or intersection_over_union(
+#                     torch.tensor(chosen_box[3:]),
+#                     torch.tensor(box[3:]),
+#                     box_format=box_format,
+#                 )
+#                 < iou_threshold
+#             ]
+#             bboxes_after_nms.append([idx] + chosen_box)
+
+#         else:
+#             bboxes = [
+#                 box
+#                 for box in bboxes
+#                 if box[0] != chosen_box[0]
+#                 or intersection_over_union(
+#                     torch.tensor(chosen_box[2:]),
+#                     torch.tensor(box[2:]),
+#                     box_format=box_format,
+#                 )
+#                 < iou_threshold
+#             ]
+
+#             bboxes_after_nms.append(chosen_box)
+
+
+#     return bboxes_after_nms
+
 def non_max_suppression(bboxes, iou_threshold, threshold, box_format="midpoint"):
     """
     Video explanation of this function:
@@ -259,8 +332,8 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="midpoint")
 
         bboxes_after_nms.append(chosen_box)
 
-
     return bboxes_after_nms
+
 
 
 def mean_average_precision(
@@ -286,7 +359,8 @@ def mean_average_precision(
 
     # used for numerical stability later on
     epsilon = 1e-6
-
+    print('example pred box: {}'.format(pred_boxes[1]))
+    print('example true box: {}'.format(true_boxes[1]))
     for c in range(num_classes):
         detections = []
         ground_truths = []
@@ -301,7 +375,9 @@ def mean_average_precision(
         for true_box in true_boxes:
             if true_box[1] == c:
                 ground_truths.append(true_box)
-
+                #detections.append(true_box)
+        print('amount of predictions for class {}: {}'.format(c, len(detections)))    
+        print('amount of gt for class {}: {}'.format(c, len(ground_truths))) 
         # find the amount of bboxes for each training example
         # Counter here finds how many ground truth bboxes we get
         # for each training example, so let's say img 0 has 3,
@@ -341,17 +417,22 @@ def mean_average_precision(
                     torch.tensor(gt[3:]),
                     box_format=box_format,
                 )
-
+                   
                 if iou > best_iou:
                     
                     best_iou = iou
                     best_gt_idx = idx
-            #print('best iouuuuuuuuuuuu: {}'.format(best_iou))
+                    #if c == 2:
+                        #print('best iou for class {}: {}'.format(c, iou))    
+            
+            #print('best iouuuuuuuuuuuu for class {}: {}'.format(c, best_iou))
             if best_iou > iou_threshold:
                 #print('best iouuuuuuuuuuuu')
+                #print('best iouuuuuuuuuuuu of class {}: {}'.format(c, best_iou))
                 # only detect ground truth detection once
                 if amount_bboxes[detection[0]][best_gt_idx] == 0:
                     # true positive and add this bounding box to seen
+                    print('another TP for class {}'.format(c))
                     TP[detection_idx] = 1
                     amount_bboxes[detection[0]][best_gt_idx] = 1
                 else:
@@ -362,7 +443,8 @@ def mean_average_precision(
                 FP[detection_idx] = 1
 
         TP_cumsum = torch.cumsum(TP, dim=0)
-        #print('TP: {}'.format(TP_cumsum))
+        # if c == 2:
+        #     print('TP: {}'.format(TP_cumsum))
         FP_cumsum = torch.cumsum(FP, dim=0)
         recalls = TP_cumsum / (total_true_bboxes + epsilon)
         precisions = TP_cumsum / (TP_cumsum + FP_cumsum + epsilon)
@@ -371,7 +453,10 @@ def mean_average_precision(
         precisions = torch.cat((torch.tensor([1]), precisions))
         recalls = torch.cat((torch.tensor([0]), recalls))
         # torch.trapz for numerical integration
+        
+
         average_precisions.append(torch.trapz(precisions, recalls))
+        print('AP for class {}: {}'.format(c, torch.trapz(precisions, recalls)))
 
     return sum(average_precisions) / len(average_precisions)
 
@@ -504,6 +589,11 @@ def get_evaluation_bboxes(
     box_format="midpoint",
     device="cuda",
 ):
+
+    scaled_anchors = (
+        torch.tensor(cfg.dataset_cfg.anchors)
+        * torch.tensor(cfg.dataset_cfg.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
+    ).to(device)
     # make sure model is in eval before get bboxes
     model.eval()
     train_idx = 0
@@ -522,42 +612,79 @@ def get_evaluation_bboxes(
                             x[k][i] = x[k][i].to(device)
 
         labels = data['bbox']
+        # print('LABELS INFO: {}'.format(labels[0].shape))
+        # print('LABELS INFO: {}'.format(labels[1].shape))
+        # print('LABELS INFO: {}'.format(labels[2].shape))
+        # print('LABELS INFO: {}'.format(labels[3].shape))
 
         with torch.no_grad():
             predictions = model(x)
         predictions = predictions['bbox']
+        print('predictions shape: {}'.format(predictions[2].shape))
+        print('labels shape: {}'.format(labels[2].shape))
         batch_size = x['rgb'].shape[0]
+        
         bboxes = [[] for _ in range(batch_size)]
-        for i in range(3):
+        true_bboxes = [[] for _ in range(batch_size)]
+        for i in range(4):
             S = predictions[i].shape[2]
             anchor = torch.tensor([*anchors[i]]).to(device) * S
             boxes_scale_i = cells_to_bboxes(
-                predictions[i], anchor, S=S, is_preds=True
+                predictions[i], scaled_anchors[i], S=S, is_preds=True
             )
             for idx, (box) in enumerate(boxes_scale_i):
                 bboxes[idx] += box
+            
 
-        # we just want one bbox for each label, not one for each scale
+            # true_boxes_scale_i = cells_to_bboxes(labels[i], anchor, S=S, is_preds=False)
+
+            # for idx, (box) in enumerate(true_boxes_scale_i):
+            #     true_bboxes[idx] += box
+
+        # S = predictions[2].shape[2]
+        # anchor = torch.tensor([*anchors[2]]).to(device) * S
+        # boxes_scale_i = cells_to_bboxes(
+        #         predictions[2], anchor, S=S, is_preds=True
+        #     )
+        # for idx, (box) in enumerate(boxes_scale_i):
+        #         bboxes[idx] += box
+
+
+        #pred_bboxes_flat = [item for sublist in pred_bboxes for item in sublist]
+        #we just want one bbox for each label, not one for each scale
         true_bboxes = cells_to_bboxes(
-            labels[2], anchor, S=S, is_preds=False
+            labels[3], anchor, S=S, is_preds=False
         )
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pred_bboxes length: {}'.format(len(bboxes)))    
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pred_bboxes length: {}'.format(len(bboxes[0])))
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! bboxes[0]: {}'.format(bboxes[0][0]))
 
         for idx in range(batch_size):
+
+            print('BBOX pre-NMS: {}'.format(len(bboxes[idx])))
             nms_boxes = non_max_suppression(
                 bboxes[idx],
-                iou_threshold=iou_threshold,
-                threshold=threshold,
-                box_format=box_format,
+                0.5,
+                0.8
+                #iou_threshold=iou_threshold,
+                #threshold=threshold,
+                #box_format=box_format,
             )
-
+            
+            print('BBOX post-NMS: {}'.format(len(nms_boxes)))
+            
             for nms_box in nms_boxes:
-                all_pred_boxes.append([train_idx] + nms_box)
 
+                all_pred_boxes.append([train_idx] + nms_box)
+            
+
+            print('all_true_boxes pre thresh: {}'.format(len(all_true_boxes)))
             for box in true_bboxes[idx]:
                 if box[1] > threshold:
                     all_true_boxes.append([train_idx] + box)
-
+            print('all_true_boxes post thresh: {}'.format(len(all_true_boxes)))
             train_idx += 1
 
     model.train()
+    print('all_pred_boxes length: {}'.format(len([x for x in all_pred_boxes if x[0]==0])))
     return all_pred_boxes, all_true_boxes
