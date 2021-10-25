@@ -16,6 +16,8 @@ from config import *
 from full_network import *
 from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
+from skimage.color import rgb2gray
+import cv2
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -64,12 +66,28 @@ class WarehouseDataset(Dataset):
 
         #Reading and storing the data from the npy files
         for i in range(self.data_len):
+        #for i in range(10):
             print('reading data of sample {}'.format(i))
         
             self.rgb_data.append(imageio.imread(os.path.join(self.data_path, 'rgb/{}.png'.format(i))))
            
-            
-            self.bbox_2d_tight_data.append(np.load(os.path.join(self.data_path, 'bbox_2d_tight/{}.npy'.format(i))))
+            boxes = np.load(os.path.join(self.data_path, 'bbox_2d_tight/{}.npy'.format(i)))
+            #print(type(boxes))
+            boxes_filtered = np.copy(boxes)
+            lenn = len(boxes)
+            del_indices = []
+            print('lenn : {}'.format(lenn))
+            for j in range(lenn):
+                #print('index: {}'.format(j))
+                #print('len boxes: {}'.format(len(boxes)))
+                if boxes[j][5] > 2:
+                    del_indices.append(j)
+                    #boxes_filtered = np.delete(boxes_filtered, i, 0)
+                    #lenn = len(boxes)
+                    #boxes_filtered = np.append(boxes_filtered, boxes[i])
+
+            boxes = np.delete(boxes, del_indices, 0)
+            self.bbox_2d_tight_data.append(boxes)
             #bbox data format: [?, prim path, str(label), ?, ?. int(label), x1, y1, x2, y2]
             self.depth_data.append(np.load(os.path.join(self.data_path, 'depth/{}.npy'.format(i))))
             self.semantic_data.append(np.load(os.path.join(self.data_path, 'semantic/{}.npy'.format(i))).astype('int32'))
@@ -79,7 +97,18 @@ class WarehouseDataset(Dataset):
         self.data_res = self.rgb_data[-1].shape[0]
 
         np.load = np_load_old
+        class_list = []
 
+        for i in range(len(self.bbox_2d_tight_data)):
+            for j in range(len(self.bbox_2d_tight_data[i])):
+                class_list.append(self.bbox_2d_tight_data[i][j][5])
+
+
+
+        class_list = list(set(class_list))
+
+
+        print('UNIQUE CLASSES IN DATASET: {}'.format(class_list))
     def __len__(self):
         return self.data_len
 
@@ -135,7 +164,12 @@ class WarehouseDataset(Dataset):
 
 
         ###creating the item dict that is returned by the function
+        r, g, b = cv2.split(self.rgb_data[idx][:, :, 0:3])
+        img = cv2.merge([r,r,r])
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
         item = {"rgb": torch.from_numpy(self.rgb_data[idx][:, :, 0:3]).type(self.data_dtype).permute(2, 0, 1), 
+                #"rgb": torch.from_numpy(gray).unsqueeze(0).type(self.data_dtype), 
                 "bbox": tuple(targets)[::-1],
                 "depth": torch.from_numpy(self.depth_data[idx]).type(self.data_dtype), 
                 "semantic": torch.from_numpy(self.semantic_data[idx]).type(torch.int64)}
@@ -153,10 +187,13 @@ class WarehouseDataset(Dataset):
 if __name__ == '__main__':
     
     dataset = WarehouseDataset(cfg['dataset_cfg'])
-    print(dataset[0]['bbox'][0].shape)
-    model = FullNet(cfg=cfg, device=device, yolo=True).to(device)
+    print('input image shape: {}'.format(dataset[0]['rgb'].shape))
+
+    model = FullNet(cfg=cfg, device=device).to(device)
 
     print('bbox label shape: {}'.format(dataset[0]['bbox'][0].shape))
+
+
 
 
     scaled_anchors = (
@@ -166,7 +203,7 @@ if __name__ == '__main__':
 
 
     
-    trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=10, scaled_anchors=scaled_anchors)
+    trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=80, scaled_anchors=scaled_anchors)
     
     
     
@@ -176,7 +213,7 @@ if __name__ == '__main__':
 
     writer = SummaryWriter()
     
-    trainer.visualize(0, dataset, cfg.general_cfg.TASKS.NAMES, model=model)
+    trainer.visualize(21, dataset, cfg.general_cfg.TASKS.NAMES, model=model)
 
 
     # testinput = dataset[0]

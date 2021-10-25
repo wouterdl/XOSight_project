@@ -57,7 +57,7 @@ class RandomScenario(torch.utils.data.IterableDataset):
                 return
             self.asset_path = nucleus_server + "/Library"
             #scenario_path = self.asset_path + "/Samples/Synthetic_Data/Stage/warehouse_with_sensors.usd"
-            scenario_path = self.asset_path + "/Simple_Warehouse/warehouse_GUI.usd"
+            scenario_path = self.asset_path + "/Simple_Warehouse/warehouse.usd"
         self.scenario_path = scenario_path
         self.max_queue_size = max_queue_size
         self.data_writer = None
@@ -114,14 +114,14 @@ class RandomScenario(torch.utils.data.IterableDataset):
             # prim = "/Root/Camera_01"
             # UsdGeom.XformCommonAPI(prim).SetTranslate(camera_vector)
 
-        # result, prim = omni.kit.commands.execute(
-        #     "CreateTransformComponentCommand",
-        #     prim_paths="/Root/Camera_01",
-        #     #prim_paths="/Root/SM_WallA_InnerCorner34/SM_WallB_6M",
-        #     path='/Root/Camera_01/transform_component_0',
-        #     target_points=camera_points_list,
-        #     enable_sequential_behavior=False
-        #     )
+        result, prim = omni.kit.commands.execute(
+            "CreateTransformComponentCommand",
+            prim_paths=["/Root/Camera_01"],
+            #prim_paths="/Root/SM_WallA_InnerCorner34/SM_WallB_6M",
+            #path='/Root/Camera_01/transform_component_0',
+            target_points=camera_points_list,
+            enable_sequential_behavior=False
+            )
 
         # omni.kit.commands.execute('AddRelationshipTarget',
         # relationship=Usd.Prim(</Root/Camera_01/transform_component_0>).GetRelationship('primPaths'),
@@ -324,10 +324,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser("Dataset generator")
     parser.add_argument("--scenario", type=str, help="Scenario to load from omniverse server")
-    parser.add_argument("--num_frames", type=int, default=10, help="Number of frames to record")
+    parser.add_argument("--num_frames", type=int, default=100, help="Number of frames to record")
     parser.add_argument("--writer_mode", type=str, default="npy", help="Specify output format - npy or kitti")
     parser.add_argument(
-        "--data_dir", type=str, default=os.getcwd() + "/testing/output", help="Location where data will be output"
+        "--data_dir", type=str, default=os.getcwd() + "/testing/output-test", help="Location where data will be output"
     )
     parser.add_argument("--max_queue_size", type=int, default=500, help="Max size of queue to store and process data")
     parser.add_argument(

@@ -176,6 +176,9 @@ class MTINet(nn.Module):
 
         # Feature aggregation
         for t in self.tasks:
-            out[t] = F.interpolate(self.heads[t](multi_scale_features[t]), self.img_size, mode = 'bilinear')
+            if not t == 'bbox':
+                out[t] = F.interpolate(self.heads[t](multi_scale_features[t]), self.img_size, mode = 'bilinear')
+            else: 
+                continue
             
         return out

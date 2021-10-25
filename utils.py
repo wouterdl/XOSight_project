@@ -114,9 +114,9 @@ class YoloLoss(nn.Module):
 
         # Constants signifying how much to pay for each respective part of the loss
         self.lambda_class = 1
-        self.lambda_noobj = 10
+        self.lambda_noobj = 1
         self.lambda_obj = 1
-        self.lambda_box = 10
+        self.lambda_box = 1
 
     def forward(self, predictions, target, anchors):
         """
@@ -359,8 +359,7 @@ def mean_average_precision(
 
     # used for numerical stability later on
     epsilon = 1e-6
-    print('example pred box: {}'.format(pred_boxes[1]))
-    print('example true box: {}'.format(true_boxes[1]))
+   
     for c in range(num_classes):
         detections = []
         ground_truths = []
@@ -376,8 +375,7 @@ def mean_average_precision(
             if true_box[1] == c:
                 ground_truths.append(true_box)
                 #detections.append(true_box)
-        print('amount of predictions for class {}: {}'.format(c, len(detections)))    
-        print('amount of gt for class {}: {}'.format(c, len(ground_truths))) 
+         
         # find the amount of bboxes for each training example
         # Counter here finds how many ground truth bboxes we get
         # for each training example, so let's say img 0 has 3,
@@ -422,13 +420,11 @@ def mean_average_precision(
                     
                     best_iou = iou
                     best_gt_idx = idx
-                    #if c == 2:
-                        #print('best iou for class {}: {}'.format(c, iou))    
+                      
             
-            #print('best iouuuuuuuuuuuu for class {}: {}'.format(c, best_iou))
+            
             if best_iou > iou_threshold:
-                #print('best iouuuuuuuuuuuu')
-                #print('best iouuuuuuuuuuuu of class {}: {}'.format(c, best_iou))
+                
                 # only detect ground truth detection once
                 if amount_bboxes[detection[0]][best_gt_idx] == 0:
                     # true positive and add this bounding box to seen
@@ -443,16 +439,14 @@ def mean_average_precision(
                 FP[detection_idx] = 1
 
         TP_cumsum = torch.cumsum(TP, dim=0)
-        # if c == 2:
-        #     print('TP: {}'.format(TP_cumsum))
+        
         FP_cumsum = torch.cumsum(FP, dim=0)
         recalls = TP_cumsum / (total_true_bboxes + epsilon)
         precisions = TP_cumsum / (TP_cumsum + FP_cumsum + epsilon)
-        #print('recalls: {}'.format(recalls))
-        #print('precisions: {}'.format(precisions))
+        
         precisions = torch.cat((torch.tensor([1]), precisions))
         recalls = torch.cat((torch.tensor([0]), recalls))
-        # torch.trapz for numerical integration
+        
         
 
         average_precisions.append(torch.trapz(precisions, recalls))
@@ -538,8 +532,8 @@ def plot_image_bbox(image, boxes, name='output'):
     #cmap = plt.get_cmap("tab20b")
     #class_labels = config.COCO_LABELS if config.DATASET=='COCO' else config.PASCAL_CLASSES
     #colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
-    class_labels = [0, 1, 2]
-    colors = [(128/255, 0, 0), (0, 128/255, 0), (0, 0, 128/255)]
+    class_labels = [0, 1, 2, 3]
+    colors = [(128/255, 0, 0), (0, 128/255, 0), (0, 0, 128/255), (128/255, 128/255, 128/255)]
 
     im = np.array(image).transpose(1, 2, 0)/255
     height, width, _ = im.shape
@@ -547,6 +541,7 @@ def plot_image_bbox(image, boxes, name='output'):
     # Create figure and axes
     fig, ax = plt.subplots(1)
     # Display the image
+    #ax.imshow(im, cmap='gray')
     ax.imshow(im)
 
     # box[0] is x midpoint, box[2] is width
@@ -594,6 +589,8 @@ def get_evaluation_bboxes(
         torch.tensor(cfg.dataset_cfg.anchors)
         * torch.tensor(cfg.dataset_cfg.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
     ).to(device)
+
+    
     # make sure model is in eval before get bboxes
     model.eval()
     train_idx = 0
@@ -607,15 +604,11 @@ def get_evaluation_bboxes(
                         x[k] = x[k].to(device)
 
                     elif isinstance(x[k], list):
-                        #print(data[k])
+                        
                         for i in range(len(x[k])):
                             x[k][i] = x[k][i].to(device)
 
         labels = data['bbox']
-        # print('LABELS INFO: {}'.format(labels[0].shape))
-        # print('LABELS INFO: {}'.format(labels[1].shape))
-        # print('LABELS INFO: {}'.format(labels[2].shape))
-        # print('LABELS INFO: {}'.format(labels[3].shape))
 
         with torch.no_grad():
             predictions = model(x)
@@ -629,6 +622,7 @@ def get_evaluation_bboxes(
         for i in range(4):
             S = predictions[i].shape[2]
             anchor = torch.tensor([*anchors[i]]).to(device) * S
+            
             boxes_scale_i = cells_to_bboxes(
                 predictions[i], scaled_anchors[i], S=S, is_preds=True
             )
@@ -636,55 +630,33 @@ def get_evaluation_bboxes(
                 bboxes[idx] += box
             
 
-            # true_boxes_scale_i = cells_to_bboxes(labels[i], anchor, S=S, is_preds=False)
-
-            # for idx, (box) in enumerate(true_boxes_scale_i):
-            #     true_bboxes[idx] += box
-
-        # S = predictions[2].shape[2]
-        # anchor = torch.tensor([*anchors[2]]).to(device) * S
-        # boxes_scale_i = cells_to_bboxes(
-        #         predictions[2], anchor, S=S, is_preds=True
-        #     )
-        # for idx, (box) in enumerate(boxes_scale_i):
-        #         bboxes[idx] += box
-
-
-        #pred_bboxes_flat = [item for sublist in pred_bboxes for item in sublist]
         #we just want one bbox for each label, not one for each scale
         true_bboxes = cells_to_bboxes(
             labels[3], anchor, S=S, is_preds=False
         )
-        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pred_bboxes length: {}'.format(len(bboxes)))    
-        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pred_bboxes length: {}'.format(len(bboxes[0])))
-        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! bboxes[0]: {}'.format(bboxes[0][0]))
 
         for idx in range(batch_size):
 
             print('BBOX pre-NMS: {}'.format(len(bboxes[idx])))
             nms_boxes = non_max_suppression(
                 bboxes[idx],
-                0.5,
-                0.8
-                #iou_threshold=iou_threshold,
-                #threshold=threshold,
-                #box_format=box_format,
+                iou_threshold=iou_threshold,
+                threshold=threshold,
+                box_format=box_format,
             )
-            
-            print('BBOX post-NMS: {}'.format(len(nms_boxes)))
+
             
             for nms_box in nms_boxes:
 
                 all_pred_boxes.append([train_idx] + nms_box)
             
 
-            print('all_true_boxes pre thresh: {}'.format(len(all_true_boxes)))
             for box in true_bboxes[idx]:
                 if box[1] > threshold:
                     all_true_boxes.append([train_idx] + box)
-            print('all_true_boxes post thresh: {}'.format(len(all_true_boxes)))
+
             train_idx += 1
 
     model.train()
-    print('all_pred_boxes length: {}'.format(len([x for x in all_pred_boxes if x[0]==0])))
+
     return all_pred_boxes, all_true_boxes

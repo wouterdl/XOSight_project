@@ -98,8 +98,16 @@ class MultiTaskDistillationModule(nn.Module):
     def forward(self, x):
         #print(self.self_attention[t][a](x['features_%s' %(a)]) for a in self.auxilary_tasks if a!= t)
         adapters = {t: {a: self.self_attention[t][a](x['features_%s' %(a)]) for a in self.auxilary_tasks if a!= t} for t in self.tasks}
-        #print(adapters)
-        out = {t: x['features_%s' %(t)] + torch.sum(torch.stack([v for v in adapters[t].values()]), dim=0) for t in self.tasks}
+        out = {}
+        for t in self.tasks:
+            if len(self.auxilary_tasks) == 1 and not t == 'bbox':
+                out[t] = x['features_%s' %(t)]
+            elif not t == 'bbox':
+                out[t] = x['features_%s' %(t)] + torch.sum(torch.stack([v for v in adapters[t].values()]), dim=0)
+            else:
+                
+                out[t] = torch.sum(torch.stack([v for v in adapters[t].values()]), dim=0)
+        
         return out
 
 class HighResolutionHead(nn.Module):
@@ -172,6 +180,12 @@ class ScalePrediction(nn.Module):
 class AttentionModule(nn.Module):
     '''
     Attention module used to link the YOLO head to the rest of the network.
+    INPUT:
+    - input1: a [N, C, H, W] tensor, coming from the bacbone
+    - input2: a [N, C, H, W] tensor, coming from the MTInet feature distillation
+
+    OUTPUT:
+    - out: a [N, C, H, W] tensor: the inputs combined with attention applied
     '''
     def __init__(self, channel, cfg):
         super(AttentionModule, self).__init__()
@@ -185,21 +199,26 @@ class AttentionModule(nn.Module):
         self.ReLU = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, input1):
+    def forward(self, input1, input2=None):
         #print(input1.shape)
         #print(input2.keys())
         #merge = torch.cat((input1, input2), dim=0)
-        
-        merge = input1
-        x = self.conv1(merge)
-        x = self.BN1(x)
+
+        if not input2 == None: #If 2 inputs are given
+            merge = torch.cat((input1, input2), dim=1)
+        else:   #If only 1 input is given
+            merge = input1
+        #print(merge.shape)
+        xt = self.conv1(merge)
+        x = self.BN1(xt)
         x = self.ReLU(x)
         x = self.conv2(x)
         x = self.BN2(x)
         x = self.sigmoid(x)
 
-        out = merge * x
-
+        out = xt * x
+        #out = x
+        #print(out.shape)
         return out
 
 

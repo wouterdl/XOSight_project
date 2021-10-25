@@ -11,18 +11,21 @@ general_cfg = edict(loss_weights={})
 
 
 general_cfg.loss_weights['depth'] = 1
-general_cfg.loss_weights['semantic'] = 1
-general_cfg.loss_weights['bbox'] = 1
+general_cfg.loss_weights['semantic'] = 0
+general_cfg.loss_weights['bbox'] = 0
 
-general_cfg.no_classes = 3
+general_cfg.no_classes = 4
+general_cfg.no_bbox_classes = 3
+
 general_cfg.img_size = 256
 
 general_cfg.TASKS = edict(NAMES=['depth', 'semantic', 'bbox'])
+#general_cfg.TASKS = edict(NAMES=['depth'])
 
 ##Dataset
 
 dataset_cfg = edict()
-dataset_cfg['data_path'] = os.path.join(os.getcwd(), 'output/Viewport')
+dataset_cfg['data_path'] = os.path.join(os.getcwd(), 'output-test/Viewport')
 dataset_cfg['anchors'] = [
         [(0.28, 0.22), (0.38, 0.48), (0.9, 0.78)],
         [(0.07, 0.15), (0.15, 0.11), (0.14, 0.29)],
@@ -33,7 +36,7 @@ dataset_cfg['anchors'] = [
 dataset_cfg['S'] = [8, 16, 32, 64]
 dataset_cfg['iou_thresh'] = 0.5
 
-dataset_cfg.no_classes = 3
+dataset_cfg.no_classes = 4
 
 
 ##HRnet backbone
@@ -74,9 +77,10 @@ HRnet_cfg['STAGE4']['FUSE_METHOD'] = 'SUM'
 
 MTI_cfg = edict(heads={})
 
-MTI_cfg.TASKS = edict(NAMES=['depth', 'semantic'])
-MTI_cfg.AUXILARY_TASKS = edict(NAMES=['depth', 'semantic'])
-
+MTI_cfg.TASKS = edict(NAMES=['depth', 'semantic', 'bbox'])
+MTI_cfg.AUXILARY_TASKS = edict(NAMES=[ 'semantic','depth'])
+#MTI_cfg.TASKS = edict(NAMES=['depth'])
+#MTI_cfg.AUXILARY_TASKS = edict(NAMES=['depth'])
 
 MTI_cfg.AUXILARY_TASKS.NUM_OUTPUT = edict(depth=1, semantic=general_cfg.no_classes)
 

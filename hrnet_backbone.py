@@ -357,22 +357,22 @@ class HighResolutionNet(nn.Module):
         
         last_inp_channels = np.int(np.sum(pre_stage_channels))
 
-        self.last_layer = nn.Sequential(
-            nn.Conv2d(
-                in_channels=last_inp_channels,
-                out_channels=last_inp_channels,
-                kernel_size=1,
-                stride=1,
-                padding=0),
-            self.norm_layer(last_inp_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(
-                in_channels=last_inp_channels,
-                out_channels=19,
-                kernel_size=1,
-                stride=1,
-                padding=0)
-        )
+        # self.last_layer = nn.Sequential(
+        #     nn.Conv2d(
+        #         in_channels=last_inp_channels,
+        #         out_channels=last_inp_channels,
+        #         kernel_size=1,
+        #         stride=1,
+        #         padding=0),
+        #     self.norm_layer(last_inp_channels),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(
+        #         in_channels=last_inp_channels,
+        #         out_channels=19,
+        #         kernel_size=1,
+        #         stride=1,
+        #         padding=0)
+        # )
 
 
     def _make_transition_layer(
