@@ -18,13 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
 from skimage.color import rgb2gray
 import cv2
-from hrnet_backbone import *
-
-
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = torch.device("cpu")
-
+import time
 
 class WarehouseDataset(Dataset):
     '''
@@ -181,70 +175,41 @@ class WarehouseDataset(Dataset):
 
 
 
-
-
-
-
-
 if __name__ == '__main__':
-    
 
-    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     dataset = WarehouseDataset(cfg['dataset_cfg'])
-    print('input image shape: {}'.format(dataset[0]['rgb'].shape))
 
     model = FullNet(cfg=cfg, device=device).to(device)
 
-    print('bbox label shape: {}'.format(dataset[0]['bbox'][0].shape))
-
-    writer = SummaryWriter()
-    #backbone_model = hrnet_backbone.HighResolutionNet(cfg=cfg.HRnet_cfg)
-
-
-
-    #writer.add_graph(backbone_model, dataset[0]['rgb'].unsqueeze(0))
-
-
-
-    scaled_anchors = (
-        torch.tensor(cfg.dataset_cfg.anchors)
-        * torch.tensor(cfg.dataset_cfg.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
-    ).to(device)
-
-
-    
-    trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=100, scaled_anchors=scaled_anchors)
-    
-    
-    
-
-    trainer.train()
-
-
-    
-    
-    trainer.visualize(21, dataset, cfg.general_cfg.TASKS.NAMES, model=model)
-
-    
-    writer.close()
-
-    # testinput = dataset[0]
-    # testinput['rgb'] = testinput['rgb'].unsqueeze(0)
-
-
-    # for k, v in testinput.items():
-    #                 if torch.is_tensor(testinput[k]):
-    #                     testinput[k] = testinput[k].to(device)
-
-    #                 elif isinstance(testinput[k], list):
-    #                     #print(data[k])
-    #                     for i in range(len(testinput[k])):
-    #                         testinput[k][i] = testinput[k][i].to(device)
-    # testoutput = model(testinput)
-    # print(testoutput['bbox'][0].shape)
-    
-
-
+    max_time = 0.
+    avg_time = 0.
+    time_list = []
 
     
 
+    for j in range(len(dataset)):
+        
+        groundtruth = dataset[j]
+        for k, v in groundtruth.items():
+            if torch.is_tensor(groundtruth[k]):
+                groundtruth[k] = torch.unsqueeze(v, 0).to(device)
+
+            elif isinstance(groundtruth[k], list):
+                        #print(data[k])
+                        for i in range(len(groundtruth[k])):
+                            groundtruth[k][i] = groundtruth[k][i].to(device)
+        start = time.time()
+        output = model(groundtruth)
+
+        exec_time = (time.time()-start)
+        time_list.append(exec_time)
+        if exec_time > max_time:
+            max_time = exec_time
+
+    avg_time = sum(time_list)/len(time_list)
+
+    print('RESULTS:')
+    print('AVG TIME: {} s MAX TIME: {} s'.format(avg_time, max_time))
+    print('AVG FREG: {} Hz '.format(1/avg_time))

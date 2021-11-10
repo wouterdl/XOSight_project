@@ -58,7 +58,7 @@ class FullNet(nn.Module):
         
         #Get the features from the backbone
         init_features = self.backbone(x['rgb'])
-
+        #init_features = self.backbone(x)
         # for tag, parm in self.backbone.named_parameters():
         #     if parm.grad == None:
         #         print('NONETYPE PARM: {}'.format(tag))

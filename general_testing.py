@@ -57,7 +57,7 @@ class RandomScenario(torch.utils.data.IterableDataset):
                 return
             self.asset_path = nucleus_server + "/Library"
             #scenario_path = self.asset_path + "/Samples/Synthetic_Data/Stage/warehouse_with_sensors.usd"
-            scenario_path = self.asset_path + "/Simple_Warehouse/warehouse.usd"
+            scenario_path = self.asset_path + "/Simple_Warehouse/warehouse_GUI.usd"
         self.scenario_path = scenario_path
         self.max_queue_size = max_queue_size
         self.data_writer = None
@@ -126,19 +126,84 @@ class RandomScenario(torch.utils.data.IterableDataset):
         # omni.kit.commands.execute('AddRelationshipTarget',
         # relationship=Usd.Prim(</Root/Camera_01/transform_component_0>).GetRelationship('primPaths'),
         # target=Sdf.Path('/Root/Camera_01'))
+        #box_path = ['/Root/Box02/Mesh']
+        box_path = ['/Root/Box02']
+        texture_paths = ['omniverse://localhost/Library/new_boxes/Textures/Box02-03Diffuse06.png', 'omniverse://localhost/Library/new_boxes/Textures/Box02-03Diffuse05.png']
 
-
-
-
+        # result, prim = omni.kit.commands.execute(
+        #     'CreateTextureComponentCommand',
+        #     prim_paths=box_path,
+        #     enable_project_uvw=False,
+        #     texture_list=texture_paths,
+        #     duration=0.1,
+        #     include_children=True,
+        # )
 
         # result, prim = omni.kit.commands.execute(
         #     'CreateVisibilityComponentCommand',
-        #     prim_paths=['/Root/Group_05/SM_PaletteA_359/SM_PaletteA_01'],
+        #     prim_paths=['/Root/Group_05/SM_PaletteA_359', '/Root/Group_18/Group'],
         #     num_visible_range=(0, 0),
         #     duration=1.0,
         #     include_children=True,
         #     seed=12345
         # )
+
+        palette_paths = [
+            '/Root/Group_17/SM_PaletteA_309',
+            '/Root/Group_18/SM_PaletteA_309',
+            '/Root/Group_05/SM_PaletteA_359',
+            '/Root/Group_02/SM_PaletteA_11',
+            '/Root/Group_19/SM_PaletteA_6',
+            '/Root/Group_20/SM_PaletteA_309',
+            '/Root/Group_04/SM_PaletteA_5',
+            '/Root/Group_10/SM_PaletteA_6',
+            '/Root/Group_21/SM_PaletteA_309',
+            '/Root/Group_08/SM_PaletteA_78',
+            '/Root/Group_22/SM_PaletteA_6',
+            '/Root/Group_23/SM_PaletteA_11',
+            '/Root/Group_06/SM_PaletteA_5',
+            '/Root/Group_09/SM_PaletteA_309',
+            '/Root/Group_03/SM_PaletteA_11',
+            '/Root/SM_PaletteA_465',
+            '/Root/Group/SM_PaletteA_309',
+            '/Root/Group_11/SM_PaletteA_6',
+            '/Root/SM_PaletteA_314',
+            '/Root/Group_07/SM_PaletteA_309',
+            '/Root/SM_PaletteA_316',
+            '/Root/Group_16/SM_PaletteA_6',
+            '/Root/SM_PaletteA_161',
+            '/Root/SM_PaletteA_151',
+            
+            ]
+
+        texture_paths = ['omniverse://localhost/Isaac/Samples/DR/Materials/Textures/checkered.png', 
+            'omniverse://localhost/Isaac/Samples/DR/Materials/Textures/checkered_color.png', 
+            'omniverse://localhost/Isaac/Samples/DR/Materials/Textures/marble_tile.png',
+            'omniverse://localhost/Isaac/Samples/DR/Materials/Textures/textured_wall.png',
+            'omniverse://localhost/Isaac/Samples/DR/Materials/Textures/picture_a.png',
+            'omniverse://localhost/Isaac/Samples/DR/Materials/Textures/picture_b.png']
+        
+        result, prim = omni.kit.commands.execute(
+            'CreateTextureComponentCommand',
+            prim_paths=palette_paths,
+            enable_project_uvw=False,
+            texture_list=texture_paths,
+            duration=1.0,
+            include_children=True,
+        )
+        
+        
+        
+        result, prim = omni.kit.commands.execute(
+            "CreateColorComponentCommand",
+            prim_paths=palette_paths,
+            first_color_range=(0.0, 0.0, 0.0),
+            second_color_range=(1.0, 1.0, 1.0),
+            roughness_range=(0.0, 1.0),
+            metallic_range=(0.0, 1.0),
+            duration=1.0,
+            include_children=False,
+        )
 
     def _setup_world(self, scenario_path):
         # Load scenario
@@ -327,7 +392,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_frames", type=int, default=100, help="Number of frames to record")
     parser.add_argument("--writer_mode", type=str, default="npy", help="Specify output format - npy or kitti")
     parser.add_argument(
-        "--data_dir", type=str, default=os.getcwd() + "/testing/output-test", help="Location where data will be output"
+        "--data_dir", type=str, default=os.getcwd() + "/testing/output_temp", help="Location where data will be output"
     )
     parser.add_argument("--max_queue_size", type=int, default=500, help="Max size of queue to store and process data")
     parser.add_argument(

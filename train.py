@@ -7,6 +7,9 @@ from utils import *
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib as plt
 from config import *
+import tty
+import sys
+import termios
 
 
 class NetworkTrainer(object):
@@ -14,7 +17,7 @@ class NetworkTrainer(object):
     Class that trains the specified network.
     '''
 
-    def __init__(self, model, dataset, tasks, loss_weights, scaled_anchors, optimizer='sgd', learning_rate=0.005, momentum=0.9, max_epochs=20, batch_size=2, num_workers=2, device='cuda'):
+    def __init__(self, model, dataset, tasks, loss_weights, scaled_anchors, optimizer='sgd', learning_rate=0.0001, momentum=0.9, max_epochs=20, batch_size=2, num_workers=2, device='cuda'):
         super(NetworkTrainer, self).__init__()
         self.model = model
         self.optimizer = optimizer
@@ -148,12 +151,12 @@ class NetworkTrainer(object):
                         task_loss = self.loss_weights[t] * self.criterion[t](outputs[t], data[t])
                         loss += task_loss
 
-                        if t == 'depth':
+                        # if t == 'depth':
                             
-                            epoch_train_rmse += self.criterion[t](outputs[t], data[t])
+                        #     epoch_train_rmse += self.criterion[t](outputs[t], data[t])
                     
-                    epoch_train_loss[t] += task_loss / self.loss_weights[t]
-                    epoch_train_loss['total_loss'] += loss
+                    epoch_train_loss[t] += task_loss.detach() / self.loss_weights[t]
+                    epoch_train_loss['total_loss'] += loss.detach()
 
 
 
@@ -178,7 +181,7 @@ class NetworkTrainer(object):
 
             self.writer.add_scalar('total trainig loss', epoch_train_loss['total_loss'], epoch)
 
-            if epoch > 0 and epoch % 100 == 0:
+            if epoch > 0 and epoch % 1 == 0:
             
                 for i, data in enumerate(self.test_loader, 0):
 
@@ -209,8 +212,8 @@ class NetworkTrainer(object):
                             loss += task_loss
 
                         
-                        epoch_test_loss[t] += task_loss / self.loss_weights[t]
-                        epoch_test_loss['total_loss'] += loss
+                        epoch_test_loss[t] += task_loss.detach() / self.loss_weights[t]
+                        epoch_test_loss['total_loss'] += loss.detach()
 
                 
                 for t in self.tasks:
@@ -219,15 +222,35 @@ class NetworkTrainer(object):
 
                 self.writer.add_scalar('total test loss', epoch_test_loss['total_loss'], epoch)
 
-            if epoch > 0 and epoch % 20 == 0:
+            if epoch > 0 and epoch % 1 == 0:
 
                 self.get_accuracy_metrics(self.test_loader, self.tasks, epoch, 'test')
 
 
-            train_loss_history.append(epoch_train_loss)
+            #train_loss_history.append(epoch_train_loss)
             
 
-            depth_rmse_history.append(epoch_train_rmse)
+            #depth_rmse_history.append(epoch_train_rmse)
+
+            orig_settings = termios.tcgetattr(sys.stdin)
+
+            tty.setcbreak(sys.stdin)
+            if epoch == (self.max_epochs - 1):
+                while True:
+                    print('Want to save the network? [Y/N]')
+                    if sys.stdin.read(1)[0] == 'y':
+                        path = os.path.join(os.getcwd(), 'saved_nets/test_network.pt')
+                        torch.save(self.model.state_dict(), path)
+
+                        print('saved model to {}'.format(path))
+                        break
+
+
+                    elif sys.stdin.read(1)[0] == 'n':
+                        print('network not saved')
+                        break
+
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_settings)   
 
 
             
@@ -239,6 +262,7 @@ class NetworkTrainer(object):
 
 
             if t == 'bbox':
+                
                 pred_boxes, true_boxes = get_evaluation_bboxes(
                     loader=self.test_loader,
                     model = self.model,

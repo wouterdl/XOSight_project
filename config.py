@@ -10,9 +10,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 general_cfg = edict(loss_weights={})
 
 
-general_cfg.loss_weights['depth'] = 1
-general_cfg.loss_weights['semantic'] = 0
-general_cfg.loss_weights['bbox'] = 0
+general_cfg.loss_weights['depth'] = 0.1
+general_cfg.loss_weights['semantic'] = 10
+general_cfg.loss_weights['bbox'] = 10
 
 general_cfg.no_classes = 4
 general_cfg.no_bbox_classes = 3
@@ -25,7 +25,7 @@ general_cfg.TASKS = edict(NAMES=['depth', 'semantic', 'bbox'])
 ##Dataset
 
 dataset_cfg = edict()
-dataset_cfg['data_path'] = os.path.join(os.getcwd(), 'output-test/Viewport')
+dataset_cfg['data_path'] = os.path.join(os.getcwd(), 'output_temp/Viewport')
 dataset_cfg['anchors'] = [
         [(0.28, 0.22), (0.38, 0.48), (0.9, 0.78)],
         [(0.07, 0.15), (0.15, 0.11), (0.14, 0.29)],
@@ -45,6 +45,34 @@ HRnet_cfg = edict()
 HRnet_cfg['STAGE1'], HRnet_cfg['STAGE2'], HRnet_cfg['STAGE3'], HRnet_cfg['STAGE4'] = edict(), edict(), edict(), edict()
 
 
+# HRnet_cfg['STAGE1']['NUM_MODULES'] = 1
+# HRnet_cfg['STAGE1']['NUM_BRANCHES'] = 1
+# HRnet_cfg['STAGE1']['NUM_BLOCKS'] = [4]
+# HRnet_cfg['STAGE1']['NUM_CHANNELS'] = [64]
+# HRnet_cfg['STAGE1']['BLOCK'] = 'BOTTLENECK'
+# HRnet_cfg['STAGE1']['FUSE_METHOD'] = 'SUM'
+
+# HRnet_cfg['STAGE2']['NUM_MODULES'] = 1
+# HRnet_cfg['STAGE2']['NUM_BRANCHES'] = 2
+# HRnet_cfg['STAGE2']['NUM_BLOCKS'] = [4, 4]
+# HRnet_cfg['STAGE2']['NUM_CHANNELS'] = [18, 36]
+# HRnet_cfg['STAGE2']['BLOCK'] = 'BASIC'
+# HRnet_cfg['STAGE2']['FUSE_METHOD'] = 'SUM'
+
+# HRnet_cfg['STAGE3']['NUM_MODULES'] = 4
+# HRnet_cfg['STAGE3']['NUM_BRANCHES'] = 3
+# HRnet_cfg['STAGE3']['NUM_BLOCKS'] = [4, 4, 4]
+# HRnet_cfg['STAGE3']['NUM_CHANNELS'] = [18, 36, 72]
+# HRnet_cfg['STAGE3']['BLOCK'] = 'BASIC'
+# HRnet_cfg['STAGE3']['FUSE_METHOD'] = 'SUM'
+
+# HRnet_cfg['STAGE4']['NUM_MODULES'] = 3
+# HRnet_cfg['STAGE4']['NUM_BRANCHES'] = 4
+# HRnet_cfg['STAGE4']['NUM_BLOCKS'] = [4, 4, 4, 4]
+# HRnet_cfg['STAGE4']['NUM_CHANNELS'] = [18, 36, 72, 144]
+# HRnet_cfg['STAGE4']['BLOCK'] = 'BASIC'
+# HRnet_cfg['STAGE4']['FUSE_METHOD'] = 'SUM'
+
 HRnet_cfg['STAGE1']['NUM_MODULES'] = 1
 HRnet_cfg['STAGE1']['NUM_BRANCHES'] = 1
 HRnet_cfg['STAGE1']['NUM_BLOCKS'] = [4]
@@ -54,22 +82,28 @@ HRnet_cfg['STAGE1']['FUSE_METHOD'] = 'SUM'
 
 HRnet_cfg['STAGE2']['NUM_MODULES'] = 1
 HRnet_cfg['STAGE2']['NUM_BRANCHES'] = 2
-HRnet_cfg['STAGE2']['NUM_BLOCKS'] = [4, 4]
+# HRnet_cfg['STAGE2']['NUM_BLOCKS'] = [4, 4]
+HRnet_cfg['STAGE2']['NUM_BLOCKS'] = [1, 1]
 HRnet_cfg['STAGE2']['NUM_CHANNELS'] = [18, 36]
+#HRnet_cfg['STAGE2']['NUM_CHANNELS'] = [9, 18]
 HRnet_cfg['STAGE2']['BLOCK'] = 'BASIC'
 HRnet_cfg['STAGE2']['FUSE_METHOD'] = 'SUM'
 
-HRnet_cfg['STAGE3']['NUM_MODULES'] = 4
+HRnet_cfg['STAGE3']['NUM_MODULES'] = 1
 HRnet_cfg['STAGE3']['NUM_BRANCHES'] = 3
-HRnet_cfg['STAGE3']['NUM_BLOCKS'] = [4, 4, 4]
+# HRnet_cfg['STAGE3']['NUM_BLOCKS'] = [4, 4, 4]
+HRnet_cfg['STAGE3']['NUM_BLOCKS'] = [1, 1, 1]
 HRnet_cfg['STAGE3']['NUM_CHANNELS'] = [18, 36, 72]
+#HRnet_cfg['STAGE3']['NUM_CHANNELS'] = [9, 18, 36]
 HRnet_cfg['STAGE3']['BLOCK'] = 'BASIC'
 HRnet_cfg['STAGE3']['FUSE_METHOD'] = 'SUM'
 
-HRnet_cfg['STAGE4']['NUM_MODULES'] = 3
+HRnet_cfg['STAGE4']['NUM_MODULES'] = 1
 HRnet_cfg['STAGE4']['NUM_BRANCHES'] = 4
-HRnet_cfg['STAGE4']['NUM_BLOCKS'] = [4, 4, 4, 4]
+# HRnet_cfg['STAGE4']['NUM_BLOCKS'] = [4, 4, 4, 4]
+HRnet_cfg['STAGE4']['NUM_BLOCKS'] = [1, 1, 1, 1]
 HRnet_cfg['STAGE4']['NUM_CHANNELS'] = [18, 36, 72, 144]
+#HRnet_cfg['STAGE4']['NUM_CHANNELS'] = [9, 18, 36, 72]
 HRnet_cfg['STAGE4']['BLOCK'] = 'BASIC'
 HRnet_cfg['STAGE4']['FUSE_METHOD'] = 'SUM'
 
@@ -78,7 +112,7 @@ HRnet_cfg['STAGE4']['FUSE_METHOD'] = 'SUM'
 MTI_cfg = edict(heads={})
 
 MTI_cfg.TASKS = edict(NAMES=['depth', 'semantic', 'bbox'])
-MTI_cfg.AUXILARY_TASKS = edict(NAMES=[ 'semantic','depth'])
+MTI_cfg.AUXILARY_TASKS = edict(NAMES=['depth', 'semantic'])
 #MTI_cfg.TASKS = edict(NAMES=['depth'])
 #MTI_cfg.AUXILARY_TASKS = edict(NAMES=['depth'])
 
