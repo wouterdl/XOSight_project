@@ -19,6 +19,8 @@ from torchinfo import summary
 from skimage.color import rgb2gray
 import cv2
 import time
+from hrnet_backbone import *
+
 
 class WarehouseDataset(Dataset):
     '''
@@ -188,10 +190,12 @@ if __name__ == '__main__':
     time_list = []
 
     
-
+    #Loop through dataset
     for j in range(len(dataset)):
         
         groundtruth = dataset[j]
+
+        #Move sample to device
         for k, v in groundtruth.items():
             if torch.is_tensor(groundtruth[k]):
                 groundtruth[k] = torch.unsqueeze(v, 0).to(device)
@@ -200,6 +204,8 @@ if __name__ == '__main__':
                         #print(data[k])
                         for i in range(len(groundtruth[k])):
                             groundtruth[k][i] = groundtruth[k][i].to(device)
+        
+        #start timer and run sample through network
         start = time.time()
         output = model(groundtruth)
 
@@ -213,3 +219,11 @@ if __name__ == '__main__':
     print('RESULTS:')
     print('AVG TIME: {} s MAX TIME: {} s'.format(avg_time, max_time))
     print('AVG FREG: {} Hz '.format(1/avg_time))
+    
+    def count_parameters(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    backbone_model = hrnet_backbone.HighResolutionNet(cfg=cfg.HRnet_cfg)
+    print('NUMBER OF PARAMETERS BACKBONE: {}'.format(count_parameters(backbone_model)))
+    print('NUMBER OF PARAMETERS FULL NETWORK: {}'.format(count_parameters(model)))
+    #summary(backbone_model, (3, 256, 256))

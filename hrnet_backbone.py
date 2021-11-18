@@ -342,18 +342,18 @@ class HighResolutionNet(nn.Module):
         self.transition2 = self._make_transition_layer(
             pre_stage_channels, num_channels)
         self.stage3, pre_stage_channels = self._make_stage(
-            self.stage3_cfg, num_channels)
+            self.stage3_cfg, num_channels, multi_scale_output=True)
 
         # stage 4
-        self.stage4_cfg = cfg['STAGE4']
-        num_channels = self.stage4_cfg['NUM_CHANNELS']
-        block = blocks_dict[self.stage4_cfg['BLOCK']]
-        num_channels = [
-            num_channels[i] * block.expansion for i in range(len(num_channels))]
-        self.transition3 = self._make_transition_layer(
-            pre_stage_channels, num_channels)
-        self.stage4, pre_stage_channels = self._make_stage(
-            self.stage4_cfg, num_channels, multi_scale_output=True)
+        # self.stage4_cfg = cfg['STAGE4']
+        # num_channels = self.stage4_cfg['NUM_CHANNELS']
+        # block = blocks_dict[self.stage4_cfg['BLOCK']]
+        # num_channels = [
+        #     num_channels[i] * block.expansion for i in range(len(num_channels))]
+        # self.transition3 = self._make_transition_layer(
+        #     pre_stage_channels, num_channels)
+        # self.stage4, pre_stage_channels = self._make_stage(
+        #     self.stage4_cfg, num_channels, multi_scale_output=True)
         
         last_inp_channels = np.int(np.sum(pre_stage_channels))
 
@@ -475,6 +475,7 @@ class HighResolutionNet(nn.Module):
             else:
                 x_list.append(x)
         y_list = self.stage2(x_list)
+        #x = self.stage2(x_list)
 
         x_list = []
         for i in range(self.stage3_cfg['NUM_BRANCHES']):
@@ -486,17 +487,18 @@ class HighResolutionNet(nn.Module):
             else:
                 x_list.append(y_list[i])
         y_list = self.stage3(x_list)
+        x = self.stage3(x_list)
 
-        x_list = []
-        for i in range(self.stage4_cfg['NUM_BRANCHES']):
-            if self.transition3[i] is not None:
-                if i < self.stage3_cfg['NUM_BRANCHES']:
-                    x_list.append(self.transition3[i](y_list[i]))
-                else:
-                    x_list.append(self.transition3[i](y_list[-1]))
-            else:
-                x_list.append(y_list[i])
-        x = self.stage4(x_list)
+        # x_list = []
+        # for i in range(self.stage4_cfg['NUM_BRANCHES']):
+        #     if self.transition3[i] is not None:
+        #         if i < self.stage3_cfg['NUM_BRANCHES']:
+        #             x_list.append(self.transition3[i](y_list[i]))
+        #         else:
+        #             x_list.append(self.transition3[i](y_list[-1]))
+        #     else:
+        #         x_list.append(y_list[i])
+        # x = self.stage4(x_list)
 
         # print(x[0].shape)
         # print(x[1].shape)

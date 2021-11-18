@@ -23,19 +23,32 @@ class FullNet(nn.Module):
         self.cfg = cfg
         self.input = input
         self.yolo = False
-        self.att_channel0 = [36, 18, 18]
-        self.att_channel1 = [72, 36, 36]
-        self.att_channel2 = [144, 72, 72]
-        self.att_channel3 = [288, 144, 144]
+        # self.att_channel0 = [36, 18, 18]
+        # self.att_channel1 = [72, 36, 36]
+        # self.att_channel2 = [144, 72, 72]
+        # self.att_channel3 = [288, 144, 144]
 
-        self.pred_channel0 = 18
-        self.pred_channel1 = 36
-        self.pred_channel2 = 72
-        self.pred_channel3 = 144
+        # self.pred_channel0 = 18
+        # self.pred_channel1 = 36
+        # self.pred_channel2 = 72
+        # self.pred_channel3 = 144
+
+        #set channels for attention modules at different scales
+        self.att_channel0 = [18, 9, 9]
+        self.att_channel1 = [36, 18, 18]
+        self.att_channel2 = [72, 36, 36]
+        self.att_channel3 = [144, 72, 72]
+
+        #set channels for YOLO prediction modules at different scales
+        self.pred_channel0 = 9
+        self.pred_channel1 = 18
+        self.pred_channel2 = 36
+        self.pred_channel3 = 72
 
         self.backbone = hrnet_backbone.HighResolutionNet(cfg=self.cfg.HRnet_cfg).to(device)
         self.MTINet = MTINet(cfg=self.cfg.MTI_cfg, backbone=self.backbone).to(device)
 
+        #If object detection is a task, set yolo to true
         if 'bbox' in cfg.general_cfg.TASKS.NAMES:
             print('APPLYING YOLO HEAD')
             self.yolo = True

@@ -3,6 +3,7 @@ import torch.nn as nn
 from hrnet_backbone import *
 import hrnet_backbone
 import torch.nn.functional as F
+import numpy as np
 
 
 class BasicBlock(nn.Module):
@@ -115,6 +116,7 @@ class HighResolutionHead(nn.Module):
     def __init__(self, backbone_channels, num_outputs):
         super(HighResolutionHead, self).__init__()
         last_inp_channels = sum(backbone_channels)
+        self.num_outputs = num_outputs
         self.last_layer = nn.Sequential(
             nn.Conv2d(
                 in_channels=last_inp_channels,
@@ -129,16 +131,45 @@ class HighResolutionHead(nn.Module):
                 out_channels= num_outputs,
                 kernel_size= 1,
                 stride = 1,
-                padding = 0))
+                padding = 0),
+            #nn.BatchNorm2d(num_outputs, momentum = 0.1),
+            #nn.LeakyReLU(0.2)
+            #nn.Tanh()
+            )
+
+
     
     def forward(self, x):
         x0_h, x0_w = x[0].size(2), x[0].size(3)
+        # if self.num_outputs == 1:
+        #     for i in range(len(x)):
+        #         #print('!!!!!!!!!!!!!!!!   {}   !!!!!'.format(i))
+        #         x[i] = abs(x[i])
+
+        # if self.num_outputs == 1:
+        #     x_check = np.amin(x.detach().cpu().numpy())
+
+        #     print('MIN VALUE X CHECK 1 = {}'.format(x_check))
+
         x1 = F.interpolate(x[1], (x0_h, x0_w), mode='bilinear')
         x2 = F.interpolate(x[2], (x0_h, x0_w), mode='bilinear')
         x3 = F.interpolate(x[3], (x0_h, x0_w), mode='bilinear')
 
+        if self.num_outputs == 1:
+            x1 = abs(x1)
+            x2 = abs(x2)
+            x3 = abs(x3)
+
+
         x = torch.cat([x[0], x1, x2, x3], 1)
         x = self.last_layer(x)
+
+        if self.num_outputs == 1:
+            x_check = np.amin(x.detach().cpu().numpy())
+
+            print('MIN VALUE X CHECK 2 = {}'.format(x_check))
+
+
         return x 
 
 class CNNBlock(nn.Module):

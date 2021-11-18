@@ -17,7 +17,7 @@ class NetworkTrainer(object):
     Class that trains the specified network.
     '''
 
-    def __init__(self, model, dataset, tasks, loss_weights, scaled_anchors, optimizer='sgd', learning_rate=0.0001, momentum=0.9, max_epochs=20, batch_size=2, num_workers=2, device='cuda'):
+    def __init__(self, model, dataset, tasks, loss_weights, scaled_anchors, optimizer='sgd', learning_rate=0.0001, momentum=0.9, max_epochs=20, batch_size=1, num_workers=2, device='cuda'):
         super(NetworkTrainer, self).__init__()
         self.model = model
         self.optimizer = optimizer
@@ -33,7 +33,9 @@ class NetworkTrainer(object):
         self.scaled_anchors = scaled_anchors
 
         self.criterion = {}
-        self.criterion['depth'] = nn.MSELoss()
+        # self.criterion['depth'] = nn.MSELoss()
+        #self.criterion['depth'] = nn.L1Loss()
+        self.criterion['depth'] = [SSIM(window_size=11), nn.L1Loss()]
         self.criterion['semantic'] = nn.CrossEntropyLoss()
         self.criterion['bbox'] = YoloLoss().to(device)
 
@@ -55,7 +57,10 @@ class NetworkTrainer(object):
         self.writer = SummaryWriter()
 
     def plot_grad_flow(self, named_parameters):
-        '''Plots the gradients flowing through different layers in the net during training.
+        '''
+        CURRENTLY UNUSED
+        
+        Plots the gradients flowing through different layers in the net during training.
         Can be used for checking for possible gradient vanishing / exploding problems.
         
         Usage: Plug this function in Trainer class after loss.backwards() as 
@@ -84,6 +89,10 @@ class NetworkTrainer(object):
 
     
     def move_to_device(self, data):
+        '''
+        Function that moves the data sample to the correct device.
+        '''
+
         for k, v in data.items():
                     if torch.is_tensor(data[k]):
                         data[k] = data[k].to(self.device)
@@ -129,11 +138,11 @@ class NetworkTrainer(object):
 
 
                 for t in self.tasks:
+                    #Calculate the loss per task using its specific criterion 
+
                     task_loss = 0.0
                     
                     if t == 'bbox':
-
-                        #print(data[t][1].shape)
 
                         new_loss = (
                             self.criterion[t](outputs[t][0], data[t][0], self.scaled_anchors[0])
@@ -145,7 +154,10 @@ class NetworkTrainer(object):
                         task_loss = self.loss_weights[t] * new_loss
                         loss += task_loss
                         
-                    
+                    elif t == 'depth':
+                        task_loss = self.loss_weights[t] * self.criterion[t][0](outputs[t], data[t].unsqueeze(0)) #+ self.loss_weights[t] * self.criterion[t][1](outputs[t], data[t])
+                        loss += task_loss
+                        
                     else:
 
                         task_loss = self.loss_weights[t] * self.criterion[t](outputs[t], data[t])
@@ -181,7 +193,8 @@ class NetworkTrainer(object):
 
             self.writer.add_scalar('total trainig loss', epoch_train_loss['total_loss'], epoch)
 
-            if epoch > 0 and epoch % 1 == 0:
+            if epoch > 0 and epoch % 100 == 0:
+                #Calculate the loss on the test set
             
                 for i, data in enumerate(self.test_loader, 0):
 
@@ -222,8 +235,8 @@ class NetworkTrainer(object):
 
                 self.writer.add_scalar('total test loss', epoch_test_loss['total_loss'], epoch)
 
-            if epoch > 0 and epoch % 1 == 0:
-
+            if epoch > 0 and epoch % 100 == 0:
+                #Get the accuracy metric scores on the test set
                 self.get_accuracy_metrics(self.test_loader, self.tasks, epoch, 'test')
 
 
@@ -232,9 +245,10 @@ class NetworkTrainer(object):
 
             #depth_rmse_history.append(epoch_train_rmse)
 
-            orig_settings = termios.tcgetattr(sys.stdin)
 
+            orig_settings = termios.tcgetattr(sys.stdin)
             tty.setcbreak(sys.stdin)
+            #Option to save the network to the specified location
             if epoch == (self.max_epochs - 1):
                 while True:
                     print('Want to save the network? [Y/N]')
@@ -255,14 +269,17 @@ class NetworkTrainer(object):
 
             
     def get_accuracy_metrics(self, loader, tasks, epoch, set):
+        '''
+        Function that calculates accuracy for the listed tasks. 
 
+        '''    
 
 
         for t in tasks:
 
 
             if t == 'bbox':
-                
+                #For the object detection task, get the bboxes from the predictions
                 pred_boxes, true_boxes = get_evaluation_bboxes(
                     loader=self.test_loader,
                     model = self.model,
@@ -271,7 +288,7 @@ class NetworkTrainer(object):
                     threshold=0.8,
                 )
                 
-
+                #And calculate the mAP score
                 mapval = mean_average_precision(
                     pred_boxes,
                     true_boxes,
@@ -284,7 +301,8 @@ class NetworkTrainer(object):
 
                 idx = 0
                 groundtruth = self.dataset[idx]
-                
+
+                #Save image of the result of a random sample                
                 plot_image_bbox(groundtruth['rgb'][:, :, :].detach().cpu().numpy(), [x[1:] for x in pred_boxes if x[0]==idx], name='pred_test')
                 plot_image_bbox(groundtruth['rgb'][:, :, :].detach().cpu().numpy(), [x[1:] for x in true_boxes if x[0]==idx], name='GT_test')
 
@@ -302,6 +320,7 @@ class NetworkTrainer(object):
                 
 
             if t == 'semantic':
+
                 iou_total = 0
                 for i, data in enumerate(loader, 0):
                     self.move_to_device(data)
@@ -332,17 +351,10 @@ class NetworkTrainer(object):
 
         groundtruth = dataset[idx]
 
+        self.move_to_device(groundtruth)
 
-
-        for k, v in groundtruth.items():
-            if torch.is_tensor(groundtruth[k]):
-                groundtruth[k] = torch.unsqueeze(v, 0).to(self.device)
-
-            elif isinstance(groundtruth[k], list):
-                        #print(data[k])
-                        for i in range(len(groundtruth[k])):
-                            groundtruth[k][i] = groundtruth[k][i].to(self.device)
-        output = model(groundtruth)#.to(self.device)
+        
+        output = model(groundtruth)
         print(output.keys())
 
         for t in vis_tasks:
@@ -381,18 +393,9 @@ class NetworkTrainer(object):
                 pred_bboxes = []
                 gt_bboxes = []
 
-                # S2 = cfg.dataset_cfg.S.copy()
-                # S=cfg.dataset_cfg.S.copy()
-                # S.reverse()
-
-                # print(S)
-                # print(S2)
-
+                #Convert the YOLO output to bboxes that can be plotted and apply nms
                 for i in range(len(output[t])):
-                    #print(type(output[t]))
-                    # print(output[t][i].shape)
-                    # print(torch.tensor(cfg.dataset_cfg.anchors).to(self.device)[i])
-                    # print(S[i])
+                    
                     print('gt shape before c2b: {}'.format(groundtruth[t][i].shape))
 
                     pred_bboxes.extend((cells_to_bboxes(output[t][i], self.scaled_anchors[i], S=output[t][i].shape[2])))
@@ -420,9 +423,11 @@ class NetworkTrainer(object):
 
 
             else:
-                imageio.imwrite('testing/{}_GT.jpeg'.format(t), groundtruth[t][0, :, :].detach().cpu().numpy())
-                imageio.imwrite('testing/{}_output.jpeg'.format(t), output[t][0, 0, :, :].detach().cpu().numpy())
 
+                print('max value output task {}: {}'.format(t, np.amax(output[t][0, 0, :, :].detach().cpu().numpy())))
+                imageio.imwrite('testing/{}_GT.jpeg'.format(t), groundtruth[t][0, :, :].detach().cpu().numpy())
+                imageio.imwrite('testing/{}_output.jpeg'.format(t), (output[t][0, 0, :, :].detach().cpu().numpy()+ abs(np.amin(output[t][0, :, :].detach().cpu().numpy()))))# + abs(np.amin(groundtruth[t][0, :, :].detach().cpu().numpy()))))
+                #imageio.imwrite('testing/{}_output.jpeg'.format(t), (output[t][0, 0, :, :].detach().cpu().numpy()))#+ abs(np.amin(groundtruth[t][0, :, :].detach().cpu().numpy()))))
 
 
     

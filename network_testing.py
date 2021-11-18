@@ -23,7 +23,6 @@ from hrnet_backbone import *
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = torch.device("cpu")
 
 
 class WarehouseDataset(Dataset):
@@ -68,30 +67,28 @@ class WarehouseDataset(Dataset):
 
         #Reading and storing the data from the npy files
         for i in range(self.data_len):
-        #for i in range(10):
-            print('reading data of sample {}'.format(i))
         
+            print('reading data of sample {}'.format(i))
+
+            #The groundtruth images
             self.rgb_data.append(imageio.imread(os.path.join(self.data_path, 'rgb/{}.png'.format(i))))
-           
+            #The object detection bboxes
             boxes = np.load(os.path.join(self.data_path, 'bbox_2d_tight/{}.npy'.format(i)))
-            #print(type(boxes))
-            boxes_filtered = np.copy(boxes)
             lenn = len(boxes)
             del_indices = []
             print('lenn : {}'.format(lenn))
+
             for j in range(lenn):
-                #print('index: {}'.format(j))
-                #print('len boxes: {}'.format(len(boxes)))
+                #Check which boxes aren't one of the desired classes, and remove them
                 if boxes[j][5] > 2:
                     del_indices.append(j)
-                    #boxes_filtered = np.delete(boxes_filtered, i, 0)
-                    #lenn = len(boxes)
-                    #boxes_filtered = np.append(boxes_filtered, boxes[i])
-
+                    
             boxes = np.delete(boxes, del_indices, 0)
-            self.bbox_2d_tight_data.append(boxes)
             #bbox data format: [?, prim path, str(label), ?, ?. int(label), x1, y1, x2, y2]
+            self.bbox_2d_tight_data.append(boxes)
+            #The depth estimation data
             self.depth_data.append(np.load(os.path.join(self.data_path, 'depth/{}.npy'.format(i))))
+            #The semantic segmentation data
             self.semantic_data.append(np.load(os.path.join(self.data_path, 'semantic/{}.npy'.format(i))).astype('int32'))
 
             
@@ -101,16 +98,16 @@ class WarehouseDataset(Dataset):
         np.load = np_load_old
         class_list = []
 
+        #Check and print which classes are in the dataset
         for i in range(len(self.bbox_2d_tight_data)):
             for j in range(len(self.bbox_2d_tight_data[i])):
                 class_list.append(self.bbox_2d_tight_data[i][j][5])
 
-
-
         class_list = list(set(class_list))
 
-
         print('UNIQUE CLASSES IN DATASET: {}'.format(class_list))
+
+
     def __len__(self):
         return self.data_len
 
@@ -122,7 +119,7 @@ class WarehouseDataset(Dataset):
 
         #rearranging the bbox data to [class_label, x, y, width, height]
         for i in range(self.bbox_2d_tight_data[idx].shape[0]):
-            if not self.bbox_2d_tight_data[idx][i][5] == 1:
+            if not self.bbox_2d_tight_data[idx][i][5] == 2:
                 class_label = self.bbox_2d_tight_data[idx][i][5]
                 x_center = (self.bbox_2d_tight_data[idx][i][6] + self.bbox_2d_tight_data[idx][i][8])/2
                 y_center = (self.bbox_2d_tight_data[idx][i][7] + self.bbox_2d_tight_data[idx][i][9])/2
@@ -183,9 +180,6 @@ class WarehouseDataset(Dataset):
 
 
 
-
-
-
 if __name__ == '__main__':
     
 
@@ -198,53 +192,17 @@ if __name__ == '__main__':
     print('bbox label shape: {}'.format(dataset[0]['bbox'][0].shape))
 
     writer = SummaryWriter()
-    #backbone_model = hrnet_backbone.HighResolutionNet(cfg=cfg.HRnet_cfg)
-
-
-
-    #writer.add_graph(backbone_model, dataset[0]['rgb'].unsqueeze(0))
-
-
-
+    
     scaled_anchors = (
         torch.tensor(cfg.dataset_cfg.anchors)
         * torch.tensor(cfg.dataset_cfg.S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
     ).to(device)
-
-
-    
+   
     trainer = NetworkTrainer(model=model, dataset=dataset, tasks=cfg.general_cfg.TASKS.NAMES, loss_weights=cfg.general_cfg.loss_weights, max_epochs=100, scaled_anchors=scaled_anchors)
-    
-    
-    
-
     trainer.train()
 
-
-    
-    
     trainer.visualize(21, dataset, cfg.general_cfg.TASKS.NAMES, model=model)
 
-    
     writer.close()
 
-    # testinput = dataset[0]
-    # testinput['rgb'] = testinput['rgb'].unsqueeze(0)
-
-
-    # for k, v in testinput.items():
-    #                 if torch.is_tensor(testinput[k]):
-    #                     testinput[k] = testinput[k].to(device)
-
-    #                 elif isinstance(testinput[k], list):
-    #                     #print(data[k])
-    #                     for i in range(len(testinput[k])):
-    #                         testinput[k][i] = testinput[k][i].to(device)
-    # testoutput = model(testinput)
-    # print(testoutput['bbox'][0].shape)
-    
-
-
-
-    
 
